@@ -79,7 +79,8 @@ settings = [
 ]
 botovod = Botovod(settings)
 botovod.add_handler(handler)
-botovod.start("telegram")```
+botovod.start("telegram")
+```
 
 This code setup and run Telegram echo-bot by polling
 
