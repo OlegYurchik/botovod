@@ -114,7 +114,7 @@ Method for getting requests from messangers and handle it
 
 class botovod.Agent
 
-* def __init__(manager: Botovod, name: string):
+* __init__(manager: Botovod, name: string):
 
 Agent constructor
 
