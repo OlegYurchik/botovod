@@ -3,13 +3,12 @@
 https://github.com/OlegYurchik/botovod/blob/master/LICENSE)
 [![built with Python3](https://img.shields.io/badge/built%20with-Python3-red.svg)](
 https://www.python.org/)
+[![paypal](https://img.shields.io/badge/-PayPal-blue.svg)](
+https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QEZ85BDKJCM4E)
 
 ### Description
 This is a simple and easy-to-use library for interacting with the Instagram. The library works
 through the web interface of the Instagram and does not depend on the official API
-
-[![paypal](https://img.shields.io/badge/-PayPal-blue.svg)](
-https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QEZ85BDKJCM4E)
 
 User Guide
 =================
