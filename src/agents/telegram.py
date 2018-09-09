@@ -8,48 +8,61 @@ import time
 
 class Agent(botovod.Agent):
     url = "https://api.telegram.org/bot%s/%s"
-    
-    def __init__(self, manager, name, token, method="polling", polling_delay=5):
+
+    def __init__(self, manager, name, token, method="polling", polling_delay=5,
+                 polling_daemon=False, webhook_url=None, certificate_path=None):
         super().__init__(manager, name)
         self.token = token
         self.last_update = 0
         self.method = method
+
         self.polling_delay = polling_delay
-        self.polling_thread = Thread(target=self.polling_listener)
+        self.polling_daemon = polling_daemon
+        self.polling_thread = Thread(target=self.polling_listener, daemon=polling_daemon)
         self.polling_run = False
-    
+
+        self.webhook_url = webhook_url
+        self.certificate_path = certificate_path
+
     def start(self):
         if self.method == "polling":
+            url = self.url % (self.token, "setWebhook")
+            requests.get(url)
             self.polling_run = True
             if self.polling_thread.is_alive():
                 self.polling_thread.join()
             self.polling_thread.start()
-            
+        elif self.method == "webhook":
+            self.polling_run = False
+            if self.polling_thread.is_alive():
+                self.polling_thread.join()
+            self.set_webhook()
+
     def stop(self):
         if self.method == "polling":
             self.polling_run = False
-    
+            self.polling_thread.join()
+
     def parser(self, status, headers, body):
-        data = json.loads(body)
+        update = json.loads(body)
         messages = dict()
-        for update in data["result"]:
-            if update["update_id"] <= self.last_update:
-                continue
-            self.last_update = update["update_id"]
-            if "message" in update:
-                message_data = update["message"]
-                chat_data = message_data["chat"]
-                
-                chat = Chat(chat_data["id"])
-                chat.custom = chat_data
-                message = Message()
-                message.parse(self, message_data)
-                messages[chat] = message
+        if update["update_id"] <= self.last_update:
+            return messages
+        self.last_update = update["update_id"]
+        if "message" in update:
+            message_data = update["message"]
+            chat_data = message_data["chat"]
+
+            chat = Chat(chat_data["id"])
+            chat.custom = chat_data
+            message = Message()
+            message.parse(self, message_data)
+            messages[chat] = message
         return messages
-    
+
     def responser(self):
-        return 200, [], ""
-    
+        return 200, dict(), ""
+
     def polling_listener(self):
         url = self.url % (self.token, "getUpdates")
         while self.polling_run:
@@ -57,16 +70,30 @@ class Agent(botovod.Agent):
                 response = requests.get(url, data={"offset": self.last_update + 1})
             else:
                 response = requests.get(url)
-            messages = self.parser(response.status_code, response.headers, response.text)
-            for message in messages:
+            messages = dict()
+            updates = json.loads(response.text)["result"]
+            for update in updates:
+                m = self.parser(response.status_code, response.headers, json.dumps(update))
+                messages.update(m)
+            for chat, message in messages.items():
                 for handler in self.manager.handlers:
                     try:
-                        handler(self, message)
+                        handler(self, chat, message)
                     except utils.NotPassed as e:
                         continue
                     break
             time.sleep(self.polling_delay)
-    
+
+    def set_webhook(self):
+        url = self.url % (self.token, "setWebhook")
+        data = dict()
+        files = dict()
+        if not self.webhook_url is None:
+            data["url"] = self.webhook_url
+        if not self.certificate_path is None:
+            files["certificate"] = open(self.certificate_path)
+        response = requests.get(url, data=data, files=files)
+
     def send_message(self, chat, message):
         if not message.text is None:
             url = self.url % (self.token, "sendMessage")
@@ -83,7 +110,7 @@ class Agent(botovod.Agent):
             self.send_video(chat, video)
         for location in message.locations:
             self.send_locations(chat, location)
-    
+
     def send_photo(self, chat, image):
         url = self.url % (self.token, "sendPhoto")
         data = {"chat_id": chat.id}
@@ -109,7 +136,7 @@ class Agent(botovod.Agent):
         elif not audio.file_path is None:
             with open(audio.file_path) as f:
                 response = requests.post(url, data=data, files={"audio": f})
-    
+
     def send_document(self, chat, document):
         url = self.url % (self.token, "sendDocument")
         data = {"chat_id": chat.id}
@@ -122,7 +149,7 @@ class Agent(botovod.Agent):
         elif not document.file_path is None:
             with open(document.file_path) as f:
                 response = requests.post(url, data=data, files={"document": f})
-    
+
     def send_video(self, chat, video):
         url = self.url % (self.token, "sendVideo")
         data = {"chat_id": chat.id}
@@ -135,13 +162,13 @@ class Agent(botovod.Agent):
         elif not video.file_path is None:
             with open(video.file_path) as f:
                 response = requests.post(url, data=data, files={"video": f})
-    
+
     def send_location(self, chat, location, **args):
         url = self.url % (self.token, "sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
         data.update(**args)
         response = requests.post(url, data=data)
-    
+
     def get_file(self, file_id):
         url = self.url % (self.token, "getFile")
         response = requests.get(url, data = {"file_id": file_id})
@@ -149,7 +176,7 @@ class Agent(botovod.Agent):
     """
     def get_me(self):
         pass
-    
+
     def forward_message(self, to_chat, from_chat, message):
         pass
 

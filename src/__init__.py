@@ -16,14 +16,14 @@ class Botovod:
         if not name is None:
             self.agents[name].start()
             return
-        for agent in self.agents.values:
+        for agent in self.agents.values():
             agent.start()
 
     def stop(self, name=None):
         if not name is None:
             self.agents[name].stop()
             return
-        for agent in self.agents.values:
+        for agent in self.agents.values():
             agent.stop()
     
     def listen(self, name, headers, body):
@@ -45,7 +45,7 @@ class Agent:
         for chat, message in messages.items():
             for handler in self.manager.handlers:
                 try:
-                    handler(agent, chat, message)
+                    handler(self, chat, message)
                 except utils.NotPassed as e:
                     continue
                 break
@@ -89,6 +89,7 @@ class Message(Entity):
         self.videos = []
         self.documents = []
         self.locations = []
+        self.raw = dict()
 
 
 
