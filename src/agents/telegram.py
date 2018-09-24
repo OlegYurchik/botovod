@@ -71,7 +71,10 @@ class Agent(botovod.Agent):
             else:
                 response = requests.get(url)
             messages = dict()
-            updates = json.loads(response.text)["result"]
+            try:
+                updates = json.loads(response.text)["result"]
+            except:
+                continue
             for update in updates:
                 m = self.parser(response.status_code, response.headers, json.dumps(update))
                 messages.update(m)
