@@ -6,6 +6,7 @@ from threading import Thread
 import time
 
 
+
 class Agent(botovod.Agent):
     url = "https://api.telegram.org/bot%s/%s"
 
