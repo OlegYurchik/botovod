@@ -1,7 +1,3 @@
-from . import utils
-
-
-
 class Botovod:
     def __init__(self, settings: dict):
         self.agents = dict()
@@ -41,6 +37,8 @@ class Agent:
         self.name = name
     
     def listen(self, headers: dict, body: str) -> dict:
+        from . import utils
+
         messages = self.parser(None, headers, body)
         for chat, message in messages.items():
             for handler in self.manager.handlers:
