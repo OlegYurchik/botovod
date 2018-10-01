@@ -5,7 +5,7 @@ class Botovod:
         for setting in settings:
             module = __import__(setting["agent"], fromlist=["Agent"])
             if setting["name"] in self.agents:
-                raise AlreadyExistsError("Agent with name '%s' already exists" % setting["name"])
+                raise Exception("Agent with name '%s' already exists" % setting["name"])
             agent = module.Agent(manager=self, name=setting["name"], **setting["settings"])
             self.agents[setting["name"]] = agent
 
@@ -44,7 +44,7 @@ class Agent:
             for handler in self.manager.handlers:
                 try:
                     handler(self, chat, message)
-                except utils.NotPassed as e:
+                except utils.NotPassed:
                     continue
                 break
         status, headers, body = self.responser()
@@ -62,7 +62,7 @@ class Agent:
     def responser(self):
         raise NotImplementedError
     
-    def send_message(self, chat: Chat, message: Message, **args):
+    def send_message(self, chat, message, **args):
         raise NotImplementedError
 
 
