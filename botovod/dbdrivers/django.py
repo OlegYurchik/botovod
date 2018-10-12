@@ -1,4 +1,4 @@
-from botovod import dbdrivers, Message as BotoMessage, Image, Audio, Video, Document, Location
+from botovod import agents, dbdrivers, Message as BotoMessage, Image, Audio, Video, Document, Location
 from django.core.exceptions import ValidationError
 from django.db import models
 import json
@@ -35,7 +35,7 @@ class DBDriver(dbdrivers.DBDriver):
 
 class Bot(models.Model):
     name = models.CharField(max_length=255, blank=True, unique=True)
-    agent = models.CharField(max_length=255, blank=True, choices=(botovod.agents.agent_list.items()))
+    agent = models.CharField(max_length=255, blank=True, choices=(agents.agent_list.items()))
     settings = models.TextField(blank=True, default="{}", validators=[meta_validator])
 
 

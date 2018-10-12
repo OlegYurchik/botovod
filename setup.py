@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 from os.path import join, dirname
 
 setup(
@@ -12,7 +12,6 @@ setup(
     description = "",
     long_description = open(join(dirname(__file__), "README.md")).read(),
     
-    packages = ["botovod", "botovod.agents", "botovod.dbdrivers", "botovod.extensions"],
-    package_dir = {"botovod": "src"},
+    packages = find_packages(),
     install_requires = ["requests"],
 )
