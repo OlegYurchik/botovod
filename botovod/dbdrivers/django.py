@@ -7,30 +7,35 @@ class DBDriver(dbdrivers.DBDriver):
         pass
     
     def get_follower(self, agent, chat):
-        return Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
+        obj = models.Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
+        return Follower(obj)
     
     def add_follower(self, agent, chat):
-        follower = Follower(
+        obj = models.Follower(
             chat=chat.id,
             agent=agent.__class__.__name__,
         )
-        follower.save()
-        return follower
+        obj.save()
+        return Follower(obj)
     
     def delete_follower(self, agent, chat):
         follower = Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
         follower.delete()
 
 
-class Follower(dbdrivers.Follower, models.Follower):
+class Follower(dbdrivers.Follower):
+    def __init__(self, obj):
+        self.obj = obj
+
     def get_next_step(self):
-        return self.next_step
+        return self.obj.next_step
     
     def set_next_step(self, next_step):
-        self.next_step = next_step
+        self.obj.next_step = next_step
+        self.obj.save()
     
     def get_history(self, after_date=None, before_date=None, input=None, text=None):
-        messages = Message.objects.filter(follower=self)
+        messages = models.Message.objects.filter(follower=self.obj)
         if not after_date is None:
             messages = messages.filter(date__gt=after_date)
         if not before_date is None:
@@ -42,8 +47,8 @@ class Follower(dbdrivers.Follower, models.Follower):
         return [message.to_object() for message in messages]
     
     def add_history(self, message, input=True):
-        message = Message(
-            follower = self,
+        message = models.Message(
+            follower = self.obj,
             input = input,
             text = message.text,
             images = json.loads([attachment_render(image) for image in message.images]),
@@ -57,7 +62,7 @@ class Follower(dbdrivers.Follower, models.Follower):
         message.save()
     
     def clear_history(self, after_date=None, before_date=None, input=None, text=None):
-        messages = Message.objects.filter(follower=self)
+        messages = models.Message.objects.filter(follower=self.obj)
         if not after_date is None:
             messages = messages.filter(date__gt=after_date)
         if not before_date is None:
@@ -68,21 +73,21 @@ class Follower(dbdrivers.Follower, models.Follower):
     
     def get_value(self, name):
         try:
-            return json.dumps(self.data)[name]
+            return json.dumps(self.obj.data)[name]
         except JSONDecodeError:
             return None
     
     def set_value(self, name, value):
-        data = json.dumps(self.data)
+        data = json.dumps(self.obj.data)
         data[name] = value
-        self.data = json.loads(data)
-        self.save()
+        self.obj.data = json.loads(data)
+        self.obj.save()
     
     def delete_value(self, name):
-        data = json.dumps(self.data)
+        data = json.dumps(self.obj.data)
         try:
             del data[name]
         except KeyError:
             pass
-        self.data = json.loads(data)
-        self.save()
+        self.obj.data = json.loads(data)
+        self.obj.save()
