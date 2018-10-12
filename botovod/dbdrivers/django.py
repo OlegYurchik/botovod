@@ -1,16 +1,5 @@
-from botovod import agents, dbdrivers, Message as BotoMessage, Image, Audio, Video, Document, Location
-from django.core.exceptions import ValidationError
-from django.db import models
-import json
-from json import JSONDecodeError
-
-
-
-def meta_validator(value):
-    try:
-        json.loads(value)
-    except JSONDecodeError:
-        raise ValidationError("Value is not json")
+from botovod import dbdrivers
+from botovod.extensions.djangoapp import models
 
 
 class DBDriver(dbdrivers.DBDriver):
@@ -33,21 +22,7 @@ class DBDriver(dbdrivers.DBDriver):
         follower.delete()
 
 
-class Bot(models.Model):
-    name = models.CharField(max_length=255, blank=True, unique=True)
-    agent = models.CharField(max_length=255, blank=True, choices=(agents.agent_list.items()))
-    settings = models.TextField(blank=True, default="{}", validators=[meta_validator])
-
-
-class Follower(models.Model, dbdrivers.Follower):
-    chat = models.CharField(max_length=255, blank=True)
-    bot = models.ForeignKey(Bot, blank=True, on_delete=models.CASCADE)
-    next_step = models.CharField(max_length=255, null=True)
-    data = models.TextField(blank=True, default="{}", validators=[meta_validator])
-
-    class Meta:
-        unique_together = ("chat", "agent")
-
+class Follower(dbdrivers.Follower, models.Follower):
     def get_next_step(self):
         return self.next_step
     
@@ -111,60 +86,3 @@ class Follower(models.Model, dbdrivers.Follower):
             pass
         self.data = json.loads(data)
         self.save()
-
-
-class Message(models.Model):
-    follower = models.ForeignKey(Follower, blank=True, on_delete=models.CASCADE)
-    input = models.BooleanField(blank=True)
-    text = models.TextField(null=True)
-    images = models.TextField(blank=True, default="[]", validators=[meta_validator])
-    audios = models.TextField(blank=True, default="[]", validators=[meta_validator])
-    videos = models.TextField(blank=True, default="[]", validators=[meta_validator])
-    documents = models.TextField(blank=True, default="[]", validators=[meta_validator])
-    locations = models.TextField(blank=True, default="[]", validators=[meta_validator])
-    raw = models.TextField(null=True, validators=[meta_validator])
-    date = models.DateTimeField(blank=True)
-
-    def to_object(self):
-        message = BotoMessage()
-        message.text = self.text
-        message.images = [attachment_parser(Image, image) for image in json.loads(self.images)]
-        message.audios = [attachment_parser(Audio, audio) for audio in json.loads(self.audios)]
-        message.videos = [attachment_parser(Video, video) for video in json.loads(self.videos)]
-        message.documents = [attachment_parser(Document, document) for docuemnt in json.loads(self.documents)]
-        message.locations = [location_parser(location) for location in json.loads(self.locations)]
-        message.raw = json.loads(self.raw)
-        return message
-
-
-def attachment_render(attachment):
-    return {
-        "url": attachment.url,
-        "file": attachment.file,
-        "raw": attachment.raw,
-    }
-
-
-def attachment_parser(cls, data):
-    attachment = cls()
-    attachment.url = data["url"]
-    attachment.file = data["file"]
-    attachment.raw = data["raw"]
-    return attachment
-
-
-def location_render(location):
-    return {
-        "longitude": location.longitude,
-        "latitude": location.latitude,
-        "raw": location.raw,
-    }
-
-
-def location_parser(data):
-    location = Location(
-        longitude = data["longitude"],
-        latitude = data["latitude"],
-    )
-    location.raw = data["raw"]
-    return location
