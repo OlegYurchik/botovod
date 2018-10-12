@@ -12,7 +12,7 @@ setup(
     description = "",
     long_description = open(join(dirname(__file__), "README.md")).read(),
     
-    packages = ["botovod", "botovod.agents"],
+    packages = ["botovod", "botovod.agents", "botovod.dbrivers", "botovod.extensions"],
     package_dir = {"botovod": "src"},
     install_requires = ["requests"],
 )
