@@ -1,4 +1,10 @@
 class Follower:
+    def get_agent(self):
+        raise NotImplementedError
+
+    def set_agent(self):
+        raise NotImplementedError
+
     def get_next_step(self):
         raise NotImplementedError
     

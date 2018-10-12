@@ -1,1 +1,1 @@
-from botovod.dbdrivers.django import Follower, Message
+from botovod.dbdrivers.django import Bot, Follower, Message

@@ -116,4 +116,3 @@ def only_chat(chat, cls=Agent):
             return func(agent, chat, message)
         return wrapper
     return decorator
-
