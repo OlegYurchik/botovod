@@ -1,5 +1,6 @@
 from botovod import agents, dbdrivers, Message as BotoMessage, Image, Audio, Video, Document, Location
 from django.core.exceptions import ValidationError
+from django.db import models
 import json
 from json import JSONDecodeError
 
