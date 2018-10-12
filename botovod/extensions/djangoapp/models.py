@@ -25,7 +25,7 @@ class Follower(models.Model):
     data = models.TextField(blank=True, default="{}", validators=[meta_validator])
 
     class Meta:
-        unique_together = ("chat", "agent")
+        unique_together = ("chat", "bot")
 
 
 class Message(models.Model):
