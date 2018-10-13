@@ -38,11 +38,13 @@ class Agent(botovod.Agent):
             if self.polling_thread.is_alive():
                 self.polling_thread.join()
             self.set_webhook()
+        self.running = True
 
     def stop(self):
         if self.method == "polling":
             self.polling_run = False
             self.polling_thread.join()
+        self.running = False
 
     def parser(self, status, headers, body):
         update = json.loads(body)

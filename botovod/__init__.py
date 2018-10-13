@@ -1,13 +1,17 @@
 class Botovod:
-    def __init__(self, settings: dict):
+    def __init__(self, settings = []: list):
         self.agents = dict()
         self.handlers = list()
         for setting in settings:
-            module = __import__(setting["agent"], fromlist=["Agent"])
-            if setting["name"] in self.agents:
-                raise Exception("Agent with name '%s' already exists" % setting["name"])
-            agent = module.Agent(manager=self, name=setting["name"], **setting["settings"])
-            self.agents[setting["name"]] = agent
+            self.add_agent(name=setting["name"], agent=setting["agent"],
+                           settings=setting["settings"])
+
+    def add_agent(self, name, agent, settings: dict):
+        module = __import__(agent, fromlist=["Agent"])
+        if name in self.agents:
+            raise Exception("Agent with name '%s' already exists" % name)
+        agent = module.Agent(manager=self, name=name, **settings)
+        self.agents[name] = agent
 
     def add_handler(self, handler: callable):
         self.handlers.append(handler)
@@ -26,6 +30,9 @@ class Botovod:
         for agent in self.agents.values():
             agent.stop()
     
+    def status(self, name):
+        return self.agents[name].running
+
     def listen(self, name, headers: dict, body: str) -> dict:
         agent = self.agents[name]
         return agent.listen(headers, body)
@@ -35,6 +42,7 @@ class Agent:
     def __init__(self, manager: Botovod, name: str):
         self.manager = manager
         self.name = name
+        self.running = False
     
     def listen(self, headers: dict, body: str) -> dict:
         from . import utils
