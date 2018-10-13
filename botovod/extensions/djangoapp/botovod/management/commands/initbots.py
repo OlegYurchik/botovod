@@ -1,6 +1,8 @@
 from botovod.extensions.djangoapp.botovod import manager
 from botovod.extensions.djangoapp.botovod.models import Bot
 from django.core.management.base import BaseCommand
+import json
+
 
 
 class Command(BaseCommand):
