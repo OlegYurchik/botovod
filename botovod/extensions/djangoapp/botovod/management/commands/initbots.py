@@ -7,14 +7,6 @@ class Command(BaseCommand):
     help = "Init bots"
 
     def handle(self, *args, **options):
-        manager.add_handler(start)
-        manager.add_handler(today)
-        manager.add_handler(tomorrow)
-        manager.add_handler(after_tomorrow)
-        manager.add_handler(date)
-        manager.add_handler(bite)
-        manager.add_handler(unknown)
-        
         bots = []
         if not args:
             bots = Bot.objects.all()
