@@ -1,5 +1,5 @@
 class Botovod:
-    def __init__(self, settings = []: list):
+    def __init__(self, settings: list = []):
         self.agents = dict()
         self.handlers = list()
         for setting in settings:
