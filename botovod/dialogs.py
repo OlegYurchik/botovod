@@ -2,7 +2,7 @@ class DialogHandler:
     def __init__(self, dbdriver):
         self._dbdriver = dbdriver
 
-    def __call__(self, agent, chat, message):
+    def handler(self, agent, chat, message):
         follower = self._dbdriver.get_follower(agent, chat)
         if follower is None:
             next_step = None
