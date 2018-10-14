@@ -1,5 +1,5 @@
 from botovod import dbdrivers
-from botovod.extensions.djangoapp import models
+from botovod.extensions.djangoapp.botovod import models
 
 
 class DBDriver(dbdrivers.DBDriver):
