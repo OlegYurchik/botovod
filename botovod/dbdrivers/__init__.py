@@ -32,7 +32,7 @@ class Follower:
 
 class DBDriver:
     def __init__(self, **settings):
-        self.connect(settings)
+        self.connect(**settings)
     
     def connect(self, **settings):
         raise NotImplementedError
