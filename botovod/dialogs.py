@@ -1,4 +1,4 @@
-class DialogHandler:
+class Dialog:
     def __init__(self, dbdriver):
         self._dbdriver = dbdriver
 
