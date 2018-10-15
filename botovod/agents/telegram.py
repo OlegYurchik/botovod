@@ -19,7 +19,7 @@ class Agent(botovod.Agent):
 
         self.polling_delay = polling_delay
         self.polling_daemon = polling_daemon
-        self.polling_thread = Thread(target=self.polling_listener, daemon=polling_daemon)
+        self.polling_thread = None
         self.polling_run = False
 
         self.webhook_url = webhook_url
@@ -30,8 +30,9 @@ class Agent(botovod.Agent):
             url = self.url % (self.token, "setWebhook")
             requests.get(url)
             self.polling_run = True
-            if self.polling_thread.is_alive():
+            if self.polling_thread and self.polling_thread.is_alive():
                 self.polling_thread.join()
+            self.polling_thread = Thread(target=self.polling_listener, daemon=self.polling_daemon)
             self.polling_thread.start()
         elif self.method == "webhook":
             self.polling_run = False
@@ -44,9 +45,10 @@ class Agent(botovod.Agent):
         if self.method == "polling":
             self.polling_run = False
             self.polling_thread.join()
+            self.polling_thread = None
         self.running = False
 
-    def parser(self, status, headers, body):
+    def parser(self, status: int, headers: dict, body: str):
         update = json.loads(body)
         messages = dict()
         if update["update_id"] <= self.last_update:
@@ -257,7 +259,7 @@ class Agent(botovod.Agent):
 
 class Chat(botovod.Chat):
     def __init__(self, id):
-        super().__init__(Agent, id)
+        super().__init__("botovod.agents.telegram", id)
 
 
 class Message(botovod.Message):

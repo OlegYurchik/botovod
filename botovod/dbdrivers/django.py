@@ -1,4 +1,4 @@
-from botovod import dbdrivers
+from botovod import Chat, dbdrivers
 from botovod.extensions.djangoapp.botovod import models
 
 
@@ -7,13 +7,17 @@ class DBDriver(dbdrivers.DBDriver):
         pass
     
     def get_follower(self, agent, chat):
-        obj = models.Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
+        try:
+            obj = models.Follower.objects.get(bot__name=agent.name, chat=chat.id)
+        except models.Follower.DoesNotExist:
+            return None
         return Follower(obj)
     
     def add_follower(self, agent, chat):
+        bot = models.Bot.objects.get(name=agent.name)
         obj = models.Follower(
             chat=chat.id,
-            agent=agent.__class__.__name__,
+            bot=bot,
         )
         obj.save()
         return Follower(obj)
@@ -26,6 +30,9 @@ class DBDriver(dbdrivers.DBDriver):
 class Follower(dbdrivers.Follower):
     def __init__(self, obj):
         self.obj = obj
+
+    def get_chat(self):
+        return Chat(self.obj.bot.agent, self.obj.chat)
 
     def get_next_step(self):
         return self.obj.next_step

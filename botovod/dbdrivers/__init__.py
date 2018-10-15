@@ -1,11 +1,8 @@
 class Follower:
-    def get_agent(self):
+    def get_chat(self):
         raise NotImplementedError
 
-    def set_agent(self):
-        raise NotImplementedError
-
-    def get_next_step(self):
+    def get_next_step(self) -> str:
         raise NotImplementedError
     
     def set_next_step(self, next_step="start"):
@@ -20,13 +17,13 @@ class Follower:
     def clear_history(self, after_date=None, before_date=None, input=None, text=None):
         raise NotImplementedError
 
-    def get_value(self, name):
+    def get_value(self, name: str) -> str:
         raise NotImplementedError
     
-    def set_value(self, name, value):
+    def set_value(self, name: str, value: str):
         raise NotImplementedError
 
-    def delete_value(self, name):
+    def delete_value(self, name: str):
         raise NotImplementedError
 
 

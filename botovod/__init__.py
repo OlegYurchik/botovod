@@ -6,12 +6,13 @@ class Botovod:
             self.add_agent(name=setting["name"], agent=setting["agent"],
                            settings=setting["settings"])
 
-    def add_agent(self, name, agent, settings: dict):
+    def add_agent(self, name: str, agent: str, settings: dict):
         module = __import__(agent, fromlist=["Agent"])
         if name in self.agents:
             raise Exception("Agent with name '%s' already exists" % name)
         agent = module.Agent(manager=self, name=name, **settings)
         self.agents[name] = agent
+        return agent
 
     def add_handler(self, handler: callable):
         self.handlers.append(handler)
@@ -80,8 +81,8 @@ class Entity:
 
 
 class Chat(Entity):
-    def __init__(self, agent: Agent, id):
-        self.agent = agent.__class__
+    def __init__(self, agent: str, id):
+        self.agent = agent
         self.id = id
 
 
