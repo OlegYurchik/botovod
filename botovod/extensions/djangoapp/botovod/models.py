@@ -21,6 +21,7 @@ class Bot(models.Model):
 class Follower(models.Model):
     chat = models.CharField(max_length=255, blank=True)
     bot = models.ForeignKey(Bot, blank=True, on_delete=models.CASCADE)
+    dialog = models.CharField(max_length=255, null=True)
     next_step = models.CharField(max_length=255, null=True)
     data = models.TextField(blank=True, default="{}", validators=[meta_validator])
 

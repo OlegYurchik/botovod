@@ -34,6 +34,13 @@ class Follower(dbdrivers.Follower):
     def get_chat(self):
         return Chat(self.obj.bot.agent, self.obj.chat)
 
+    def get_dialog_name(self):
+        return self.obj.dialog
+    
+    def set_dialog_name(self, name):
+        self.obj.dialog = name
+        self.obj.save()
+
     def get_next_step(self):
         return self.obj.next_step
     

@@ -2,6 +2,12 @@ class Follower:
     def get_chat(self):
         raise NotImplementedError
 
+    def get_dialog_name(self):
+        raise NotImplementedError
+    
+    def set_dialog_name(self, name):
+        raise NotImplementedError
+
     def get_next_step(self) -> str:
         raise NotImplementedError
     
