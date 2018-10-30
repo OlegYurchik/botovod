@@ -1,4 +1,4 @@
-from botovod import agents, dbdrivers, Message as BotoMessage, Image, Audio, Video, Document, Location
+from botovod import agents, Attachment, dbdrivers, Location, Message as BotoMessage
 from django.core.exceptions import ValidationError
 from django.db import models
 import json
@@ -44,10 +44,10 @@ class Message(models.Model):
     def to_object(self):
         message = BotoMessage()
         message.text = self.text
-        message.images = [attachment_parser(Image, image) for image in json.loads(self.images)]
-        message.audios = [attachment_parser(Audio, audio) for audio in json.loads(self.audios)]
-        message.videos = [attachment_parser(Video, video) for video in json.loads(self.videos)]
-        message.documents = [attachment_parser(Document, document) for docuemnt in json.loads(self.documents)]
+        message.images = [attachment_parser(image) for image in json.loads(self.images)]
+        message.audios = [attachment_parser(audio) for audio in json.loads(self.audios)]
+        message.videos = [attachment_parser(video) for video in json.loads(self.videos)]
+        message.documents = [attachment_parser(document) for document in json.loads(self.documents)]
         message.locations = [location_parser(location) for location in json.loads(self.locations)]
         message.raw = json.loads(self.raw)
         return message
@@ -61,8 +61,8 @@ def attachment_render(attachment):
     }
 
 
-def attachment_parser(cls, data):
-    attachment = cls()
+def attachment_parser(data):
+    attachment = Attachment
     attachment.url = data["url"]
     attachment.file = data["file"]
     attachment.raw = data["raw"]

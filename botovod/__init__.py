@@ -94,6 +94,7 @@ class Message(Entity):
         self.videos = []
         self.documents = []
         self.locations = []
+        self.keyboard = None
         self.date = None
         self.raw = dict()
 
@@ -101,25 +102,13 @@ class Message(Entity):
 class Attachment(Entity):
     url = None
     file = None
-        
-
-class Image(Attachment):
-    pass
-
-
-class Audio(Attachment):
-    pass
-
-
-class Video(Attachment):
-    pass
-
-
-class Document(Attachment):
-    pass
 
 
 class Location(Entity):
     def __init__(self, latitude: float, longitude: float):
         self.latitude = latitude
         self.longitude = longitude
+
+class Keyboard(Entity):
+    def __init__(self, *buttons):
+        self.buttons = buttons

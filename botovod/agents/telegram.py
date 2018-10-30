@@ -36,7 +36,7 @@ class Agent(botovod.Agent):
             self.polling_thread.start()
         elif self.method == "webhook":
             self.polling_run = False
-            if self.polling_thread.is_alive():
+            if self.polling_thread and self.polling_thread.is_alive():
                 self.polling_thread.join()
             self.set_webhook()
         self.running = True
@@ -106,6 +106,8 @@ class Agent(botovod.Agent):
         if not message.text is None:
             url = self.url % (self.token, "sendMessage")
             data = {"chat_id": chat.id, "text": message.text}
+            if not message.keyboard is None:
+                data["reply_markup"] = '{"keyboard":[%s],"resize_keyboard":true}' % ",".join([json.dumps([button]) for button in message.keyboard.buttons])
             data.update(**message.raw)
             requests.post(url, data=data)
         for image in message.images:
@@ -288,28 +290,28 @@ class Message(botovod.Message):
         self.raw = data
 
 
-class Audio(botovod.Audio):
+class Audio(botovod.Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class Document(botovod.Document):
+class Document(botovod.Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class PhotoSize(botovod.Image):
+class PhotoSize(botovod.Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class Video(botovod.Video):
+class Video(botovod.Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)

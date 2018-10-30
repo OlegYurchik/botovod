@@ -1,19 +1,24 @@
 from botovod import Chat, dbdrivers
 from botovod.extensions.djangoapp.botovod import models
+import json
+from json import JSONDecodeError
 
 
 class DBDriver(dbdrivers.DBDriver):
-    def connect(self, **settings):
+    @classmethod
+    def connect(cls, **settings):
         pass
     
-    def get_follower(self, agent, chat):
+    @classmethod
+    def get_follower(cls, agent, chat):
         try:
             obj = models.Follower.objects.get(bot__name=agent.name, chat=chat.id)
         except models.Follower.DoesNotExist:
             return None
         return Follower(obj)
     
-    def add_follower(self, agent, chat):
+    @classmethod
+    def add_follower(cls, agent, chat):
         bot = models.Bot.objects.get(name=agent.name)
         obj = models.Follower(
             chat=chat.id,
@@ -22,7 +27,8 @@ class DBDriver(dbdrivers.DBDriver):
         obj.save()
         return Follower(obj)
     
-    def delete_follower(self, agent, chat):
+    @classmethod
+    def delete_follower(cls, agent, chat):
         follower = Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
         follower.delete()
 
@@ -87,21 +93,24 @@ class Follower(dbdrivers.Follower):
     
     def get_value(self, name):
         try:
-            return json.dumps(self.obj.data)[name]
-        except JSONDecodeError:
+            return json.loads(self.obj.data)[name]
+        except (KeyError, JSONDecodeError):
             return None
     
     def set_value(self, name, value):
-        data = json.dumps(self.obj.data)
+        try:
+            data = json.loads(self.obj.data)
+        except JSONDecodeError:
+            data = dict()
         data[name] = value
-        self.obj.data = json.loads(data)
+        self.obj.data = json.dumps(data)
         self.obj.save()
     
     def delete_value(self, name):
-        data = json.dumps(self.obj.data)
+        data = json.loads(self.obj.data)
         try:
             del data[name]
         except KeyError:
             pass
-        self.obj.data = json.loads(data)
+        self.obj.data = json.dumps(data)
         self.obj.save()
