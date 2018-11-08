@@ -2,6 +2,8 @@ from botovod import Chat, dbdrivers
 from botovod.extensions.djangoapp.botovod import models
 import json
 from json import JSONDecodeError
+import logging
+
 
 
 class DBDriver(dbdrivers.DBDriver):
@@ -94,13 +96,19 @@ class Follower(dbdrivers.Follower):
     def get_value(self, name):
         try:
             return json.loads(self.obj.data)[name]
-        except (KeyError, JSONDecodeError):
-            return None
+        except KeyError:
+            logging.warning("Value '%s' doesn't exist for follower %s %s", name,
+                            self.obj.bot.agent, self.obj.chat)
+        except JSONDecodeError:
+            logging.error("Cannot get value '%s' for follower %s %s - incorrect json",
+                          name, self.obj.bot.agent, self.obj.chat)
     
     def set_value(self, name, value):
         try:
             data = json.loads(self.obj.data)
         except JSONDecodeError:
+            logging.error("Incorrect json structure for follower %s %s",
+                            self.obj.bot.agent, self.obj.chat)
             data = dict()
         data[name] = value
         self.obj.data = json.dumps(data)
@@ -111,6 +119,7 @@ class Follower(dbdrivers.Follower):
         try:
             del data[name]
         except KeyError:
-            pass
+            logging.warning("Cannot delete value '%s' for follower %s %s - doesn't exist",
+                            name, self.obj.bot.agent, self.obj.chat)
         self.obj.data = json.dumps(data)
         self.obj.save()

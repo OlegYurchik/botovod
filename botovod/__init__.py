@@ -1,5 +1,17 @@
+import logging
+import sys
+
+
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logging.basicConfig(stream=sys.stdout,
+                    format="%(asctime)s %(levelname)s %(module)s L%(lineno)s %(message)s")
+
+
 class Botovod:
     def __init__(self, settings: list = []):
+        logging.info("Initialiaze Botovod manager")
         self.agents = dict()
         self.handlers = list()
         for setting in settings:
@@ -7,9 +19,10 @@ class Botovod:
                            settings=setting["settings"])
 
     def add_agent(self, name: str, agent: str, settings: dict):
+        logging.info("Add agent '%s' - '%s'", agent, name)
         module = __import__(agent, fromlist=["Agent"])
         if name in self.agents:
-            raise Exception("Agent with name '%s' already exists" % name)
+            logging.error("Agent with name '%s' already exists", name)
         agent = module.Agent(manager=self, name=name, **settings)
         self.agents[name] = agent
         return agent
@@ -41,22 +54,28 @@ class Botovod:
 
 class Agent:
     def __init__(self, manager: Botovod, name: str):
+        logging.info("Initialize agent '%s'", name)
         self.manager = manager
         self.name = name
         self.running = False
     
     def listen(self, headers: dict, body: str) -> dict:
+        logging.info("Get request for agent '%s' - '%s'", self.name, self.__class__.__name__)
         from . import utils
 
         messages = self.parser(None, headers, body)
-        for chat, message in messages.items():
+        response = None
+        for chat, message in messages:
             for handler in self.manager.handlers:
                 try:
-                    handler(self, chat, message)
+                    response = handler(self, chat, message)
                 except utils.NotPassed:
                     continue
                 break
-        status, headers, body = self.responser()
+        if not response is None:
+            status, headers, body = response
+        else:
+            status, headers, body = self.responser(200, headers, body)
         return {"status": status, "headers": headers, "body": body}
     
     def start(self):
@@ -68,7 +87,7 @@ class Agent:
     def parser(self, status: int, headers: dict, body: str):
         raise NotImplementedError
     
-    def responser(self):
+    def responser(self, status: int, headers: dict, body: str):
         raise NotImplementedError
     
     def send_message(self, chat, message, **args):
@@ -109,6 +128,28 @@ class Location(Entity):
         self.latitude = latitude
         self.longitude = longitude
 
+
 class Keyboard(Entity):
     def __init__(self, *buttons):
         self.buttons = buttons
+
+
+class Attachment(Entity):
+    url = None
+    file = None
+
+
+class Location(Entity):
+    def __init__(self, latitude: float, longitude: float):
+        self.latitude = latitude
+        self.longitude = longitude
+
+
+class Keyboard(Entity):
+    def __init__(self, *buttons):
+        self.buttons = buttons
+
+
+class KeyboardButton(Entity):
+    def __init__(self, text):
+        self.text = text

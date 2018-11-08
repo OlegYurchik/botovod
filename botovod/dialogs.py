@@ -1,6 +1,7 @@
 import json
 from botovod import Keyboard
 from botovod.utils import NotPassed
+import logging
 
 
 
@@ -17,8 +18,11 @@ class Dialog:
             self.follower = self._dbdriver.add_follower(agent, chat)
         dialog_name = self.follower.get_dialog_name()
         if not dialog_name is None and dialog_name != self.__class__.__name__:
+            logging.info("Dialog '%s' not passed, skipping...", self.__class__.__name__)
             raise NotPassed
-        self.follower.set_dialog_name(self.__class__.__name__)
+        logging.info("Dialog '%s' passed", self.__class__.__name__)
+        if dialog_name is None:
+            self.follower.set_dialog_name(self.__class__.__name__)
         next_step = self.follower.get_next_step()
         if next_step:
             getattr(self, next_step)()
@@ -32,9 +36,11 @@ class Dialog:
         dialog(self.agent, self.chat, self.message)
 
     def set_next_dialog(self, cls):
+        logging.info("Set next dialog '%s'", cls.__name__)
         self.follower.set_dialog_name(cls.__name__)
 
     def set_next_step(self, name):
+        logging.info("Set next step '%s'", name)
         self.follower.set_next_step(name)
     
     def reply(self, message):

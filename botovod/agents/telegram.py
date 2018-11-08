@@ -1,6 +1,7 @@
 import botovod
 from botovod import utils
 import json
+import logging
 import requests
 from threading import Thread
 import time
@@ -14,21 +15,30 @@ class Agent(botovod.Agent):
                  polling_daemon=False, webhook_url=None, certificate_path=None):
         super().__init__(manager, name)
         self.token = token
-        self.last_update = 0
         self.method = method
 
         self.polling_delay = polling_delay
         self.polling_daemon = polling_daemon
-        self.polling_thread = None
         self.polling_run = False
+        self.polling_thread = None
 
         self.webhook_url = webhook_url
         self.certificate_path = certificate_path
 
+        self.running = False
+        self.last_update = 0
+
     def start(self):
         if self.method == "polling":
             url = self.url % (self.token, "setWebhook")
-            requests.get(url)
+            response = requests.get(url)
+            try:
+                if response.status_code != 200 or response.json()["ok"] != True: 
+                    logging.error("[%s] Cannot delete webhook. Code: %s. Response: %s", self.name,
+                                  response.status_code, response.text)
+            except:
+                logging.error("[%s] Cannot delete webhook. Code: %s. Response: %s", self.name,
+                              response.status_code, response.text)
             self.polling_run = True
             if self.polling_thread and self.polling_thread.is_alive():
                 self.polling_thread.join()
@@ -50,7 +60,7 @@ class Agent(botovod.Agent):
 
     def parser(self, status: int, headers: dict, body: str):
         update = json.loads(body)
-        messages = dict()
+        messages = list()
         if update["update_id"] <= self.last_update:
             return messages
         self.last_update = update["update_id"]
@@ -62,28 +72,33 @@ class Agent(botovod.Agent):
             chat.custom = chat_data
             message = Message()
             message.parse(self, message_data)
-            messages[chat] = message
+            messages.append([chat, message])
         return messages
 
-    def responser(self):
+    def responser(self, status: int, headers: dict, body: str):
         return 200, dict(), ""
 
     def polling_listener(self):
         url = self.url % (self.token, "getUpdates")
         while self.polling_run:
-            if self.last_update:
-                response = requests.get(url, data={"offset": self.last_update + 1})
-            else:
-                response = requests.get(url)
-            messages = dict()
+            messages = list()
             try:
-                updates = json.loads(response.text)["result"]
+                if self.last_update:
+                    response = requests.get(url, data={"offset": self.last_update + 1})
+                else:
+                    response = requests.get(url)
+                updates = response.json()["result"]
             except:
+                logging.error("[%s] Get incorrect update. Code: %s. Response: %s", self.name,
+                              response.status_code, response.text)
+                time.sleep(self.polling_delay)
                 continue
+            logging.info("[%s] Get update. Code: %s. Response: %s", self.name, response.status_code,
+                         response.text)
             for update in updates:
-                m = self.parser(response.status_code, response.headers, json.dumps(update))
-                messages.update(m)
-            for chat, message in messages.items():
+                ms = self.parser(response.status_code, response.headers, json.dumps(update))
+                messages.extend(ms)
+            for chat, message in messages:
                 for handler in self.manager.handlers:
                     try:
                         handler(self, chat, message)
@@ -101,15 +116,21 @@ class Agent(botovod.Agent):
         if not self.certificate_path is None:
             files["certificate"] = open(self.certificate_path)
         response = requests.get(url, data=data, files=files)
+        if response.status_code != 200:
+            logging.error("[%s] Webhook doesn't set. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def send_message(self, chat, message):
         if not message.text is None:
             url = self.url % (self.token, "sendMessage")
             data = {"chat_id": chat.id, "text": message.text}
             if not message.keyboard is None:
-                data["reply_markup"] = '{"keyboard":[%s],"resize_keyboard":true}' % ",".join([json.dumps([button]) for button in message.keyboard.buttons])
+                data["reply_markup"] = '{"keyboard":[%s],"resize_keyboard":true}' % ",".join([json.dumps([button.text]) for button in message.keyboard.buttons])
             data.update(**message.raw)
-            requests.post(url, data=data)
+            response = requests.post(url, data=data)
+            if response.status_code != 200:
+                logging.error("[%s] Cannot send message. Code: %s; Body: %s",
+                              self.name, response.status_code, response.text)
         for image in message.images:
             self.send_photo(chat, image)
         for audio in  message.audios:
@@ -133,6 +154,11 @@ class Agent(botovod.Agent):
         elif not image.file_path is None:
             with open(image.file_path) as f:
                 response = requests.post(url, data=data, files={"photo": f})
+        else:
+            return
+        if response.status_code != 200:
+            logging.error("[%s] Cannot send photo. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def send_audio(self, chat, audio):
         url = self.url % (self.token, "sendAudio")
@@ -146,6 +172,11 @@ class Agent(botovod.Agent):
         elif not audio.file_path is None:
             with open(audio.file_path) as f:
                 response = requests.post(url, data=data, files={"audio": f})
+        else:
+            return
+        if response.status_code != 200:
+            logging.error("[%s] Cannot send audio. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def send_document(self, chat, document):
         url = self.url % (self.token, "sendDocument")
@@ -159,6 +190,11 @@ class Agent(botovod.Agent):
         elif not document.file_path is None:
             with open(document.file_path) as f:
                 response = requests.post(url, data=data, files={"document": f})
+        else:
+            return
+        if response.status_code != 200:
+            logging.error("[%s] Cannot send document. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def send_video(self, chat, video):
         url = self.url % (self.token, "sendVideo")
@@ -172,17 +208,28 @@ class Agent(botovod.Agent):
         elif not video.file_path is None:
             with open(video.file_path) as f:
                 response = requests.post(url, data=data, files={"video": f})
+        else:
+            return
+        if response.status_code != 200:
+            logging.error("[%s] Cannot send video. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def send_location(self, chat, location, **args):
         url = self.url % (self.token, "sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
         data.update(**args)
         response = requests.post(url, data=data)
+        if response.status_code != 200:
+            logging.error("[%s] Cannot send location. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
 
     def get_file(self, file_id):
         url = self.url % (self.token, "getFile")
         response = requests.get(url, data = {"file_id": file_id})
-        return json.loads(response.text)
+        if response.status_code != 200:
+            logging.error("[%s] Cannot get file. Code: %s; Body: %s",
+                          self.name, response.status_code, response.text)
+        return response.json()
     """
     def get_me(self):
         pass
