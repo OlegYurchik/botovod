@@ -13,5 +13,5 @@ setup(
     long_description = open(join(dirname(__file__), "README.md")).read(),
     
     packages = find_packages(),
-    install_requires = ["requests"],
+    install_requires = ["requests", "SQLAlchemy"],
 )

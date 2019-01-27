@@ -4,7 +4,6 @@ from botovod.utils import NotPassed
 import logging
 
 
-
 class Dialog:
     def __init__(self, dbdriver_class):
         self._dbdriver = dbdriver_class

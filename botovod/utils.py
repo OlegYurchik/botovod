@@ -2,7 +2,6 @@ from . import Agent, Chat, Message
 import re
 
 
-
 class NotPassed(Exception):
     pass
 

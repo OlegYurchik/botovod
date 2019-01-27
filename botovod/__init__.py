@@ -134,22 +134,6 @@ class Keyboard(Entity):
         self.buttons = buttons
 
 
-class Attachment(Entity):
-    url = None
-    file = None
-
-
-class Location(Entity):
-    def __init__(self, latitude: float, longitude: float):
-        self.latitude = latitude
-        self.longitude = longitude
-
-
-class Keyboard(Entity):
-    def __init__(self, *buttons):
-        self.buttons = buttons
-
-
 class KeyboardButton(Entity):
     def __init__(self, text):
         self.text = text

@@ -5,7 +5,6 @@ from json import JSONDecodeError
 import logging
 
 
-
 class DBDriver(dbdrivers.DBDriver):
     @classmethod
     def connect(cls, **settings):
@@ -31,7 +30,7 @@ class DBDriver(dbdrivers.DBDriver):
     
     @classmethod
     def delete_follower(cls, agent, chat):
-        follower = Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
+        follower = models.Follower.objects.get(agent=agent.__class__.__name__, chat=chat.id)
         follower.delete()
 
 
@@ -44,18 +43,18 @@ class Follower(dbdrivers.Follower):
 
     def get_dialog_name(self):
         return self.obj.dialog
-    
+
     def set_dialog_name(self, name):
         self.obj.dialog = name
         self.obj.save()
 
     def get_next_step(self):
         return self.obj.next_step
-    
+
     def set_next_step(self, next_step):
         self.obj.next_step = next_step
         self.obj.save()
-    
+
     def get_history(self, after_date=None, before_date=None, input=None, text=None):
         messages = models.Message.objects.filter(follower=self.obj)
         if not after_date is None:
@@ -67,22 +66,26 @@ class Follower(dbdrivers.Follower):
         if not text is None:
             messages = messages.filter(text__iregex=text)
         return [message.to_object() for message in messages]
-    
+
     def add_history(self, message, input=True):
         message = models.Message(
             follower = self.obj,
             input = input,
             text = message.text,
-            images = json.loads([attachment_render(image) for image in message.images]),
-            audios = json.loads([attachment_render(audio) for audio in message.audios]),
-            videos = json.loads([attachment_render(video) for video in message.videos]),
-            documents = json.loads([attachment_render(document) for document in message.documents]),
-            locations = json.loads([location_render(location) for locations in message.locations]),
+            images = json.loads([models.attachment_render(image) for image in message.images]),
+            audios = json.loads([models.attachment_render(audio) for audio in message.audios]),
+            videos = json.loads([models.attachment_render(video) for video in message.videos]),
+            documents = json.loads([
+                models.attachment_render(document) for document in message.documents
+            ]),
+            locations = json.loads([
+                models.location_render(location) for location in message.locations
+            ]),
             raw = json.loads(message.raw),
             date = message.date,
         )
         message.save()
-    
+
     def clear_history(self, after_date=None, before_date=None, input=None, text=None):
         messages = models.Message.objects.filter(follower=self.obj)
         if not after_date is None:
@@ -92,7 +95,7 @@ class Follower(dbdrivers.Follower):
         if not input is None:
             messages = messages.filter(input=input)
         messages.delete()
-    
+
     def get_value(self, name):
         try:
             return json.loads(self.obj.data)[name]
@@ -102,7 +105,7 @@ class Follower(dbdrivers.Follower):
         except JSONDecodeError:
             logging.error("Cannot get value '%s' for follower %s %s - incorrect json",
                           name, self.obj.bot.agent, self.obj.chat)
-    
+
     def set_value(self, name, value):
         try:
             data = json.loads(self.obj.data)
@@ -113,7 +116,7 @@ class Follower(dbdrivers.Follower):
         data[name] = value
         self.obj.data = json.dumps(data)
         self.obj.save()
-    
+
     def delete_value(self, name):
         data = json.loads(self.obj.data)
         try:
