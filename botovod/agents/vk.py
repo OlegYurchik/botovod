@@ -7,8 +7,7 @@ from threading import Thread
 import time
 
 
-
-class Agent(botovod.Agent):
+class VkAgent(botovod.Agent):
     api_url = "https://api.vk.com/method"
     bot_url = "{server}?act=a_check&key={key}&ts={ts}&wait={wait}"
     user_url = "https://{server}?act=a_check&key={key}&ts={ts}&wait={wait}&mode={mode}&version={version}"
@@ -62,8 +61,8 @@ class Agent(botovod.Agent):
         messages = list()
         if body["type"] == "message_new":
             data = body["object"]
-            chat = Chat(data["from_id"])
-            message = Message()
+            chat = VkChat(data["from_id"])
+            message = VkMessage()
             message.parse(data)
             messages.append([chat, message])
         return messages
@@ -141,7 +140,7 @@ class Agent(botovod.Agent):
             return requests.get(url)
 
 
-@utils.only_agent(Agent)
+@utils.only_agent(VkAgent)
 def confirm(agent, chat, message):
     data = json.loads(message.text)
     if data["type"] == "confirmation":
@@ -151,12 +150,12 @@ def confirm(agent, chat, message):
     return 200, dict(), "kishkish"
 
 
-class Chat(botovod.Chat):
+class VkChat(botovod.Chat):
     def __init__(self, id):
         super().__init__("botovod.agents.vk", id)
 
 
-class Message(botovod.Message):
+class VkMessage(botovod.Message):
     def parse(self, data):
         self.text = data["text"]
         self.raw = data

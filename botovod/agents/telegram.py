@@ -1,5 +1,4 @@
-import botovod
-from botovod import utils
+from botovod.agents import Agent, Attachment, Chat, Location, Message
 import json
 import logging
 import requests
@@ -7,13 +6,17 @@ from threading import Thread
 import time
 
 
+class TelegramAgent(Agent):
+    WEBHOOKS = "webhooks"
+    POLLING = "polling"
+    METHODS = {WEBHOOKS, POLLING}
 
-class Agent(botovod.Agent):
     url = "https://api.telegram.org/bot%s/%s"
 
-    def __init__(self, manager, name, token, method="polling", polling_delay=5,
-                 polling_daemon=False, webhook_url=None, certificate_path=None):
-        super().__init__(manager, name)
+    def __init__(self, token, method=POLLING, polling_delay=5, polling_daemon=False,
+                 webhook_url=None, certificate_path=None,
+                 logger: logging.Logger=logging.getLogger(__name__)):
+        super().__init__(logger)
         self.token = token
         self.method = method
 
@@ -25,7 +28,6 @@ class Agent(botovod.Agent):
         self.webhook_url = webhook_url
         self.certificate_path = certificate_path
 
-        self.running = False
         self.last_update = 0
 
     def start(self):
@@ -34,8 +36,8 @@ class Agent(botovod.Agent):
             response = requests.get(url)
             try:
                 if response.status_code != 200 or response.json()["ok"] != True: 
-                    logging.error("[%s] Cannot delete webhook. Code: %s. Response: %s", self.name,
-                                  response.status_code, response.text)
+                    self.logger.error("[%s] Cannot delete webhook. Code: %s. Response: %s",
+                                      self.name, response.status_code, response.text)
             except:
                 logging.error("[%s] Cannot delete webhook. Code: %s. Response: %s", self.name,
                               response.status_code, response.text)
@@ -68,9 +70,9 @@ class Agent(botovod.Agent):
             message_data = update["message"]
             chat_data = message_data["chat"]
 
-            chat = Chat(chat_data["id"])
+            chat = TelegramChat(chat_data["id"])
             chat.custom = chat_data
-            message = Message()
+            message = TelegramMessage()
             message.parse(self, message_data)
             messages.append([chat, message])
         return messages
@@ -99,7 +101,7 @@ class Agent(botovod.Agent):
                 ms = self.parser(response.status_code, response.headers, json.dumps(update))
                 messages.extend(ms)
             for chat, message in messages:
-                for handler in self.manager.handlers:
+                for handler in self.botovod.handlers:
                     try:
                         handler(self, chat, message)
                     except utils.NotPassed as e:
@@ -140,7 +142,7 @@ class Agent(botovod.Agent):
         for video in message.videos:
             self.send_video(chat, video)
         for location in message.locations:
-            self.send_locations(chat, location)
+            self.send_location(chat, location)
 
     def send_photo(self, chat, image):
         url = self.url % (self.token, "sendPhoto")
@@ -306,66 +308,66 @@ class Agent(botovod.Agent):
     """
     
 
-class Chat(botovod.Chat):
+class TelegramChat(Chat):
     def __init__(self, id):
         super().__init__("botovod.agents.telegram", id)
 
 
-class Message(botovod.Message):
+class TelegramMessage(Message):
     def parse(self, agent, data):
         self.text = data.get("text", None)
         for photo_data in data.get("photo", []):
-            photo = PhotoSize()
+            photo = TelegramPhotoSize()
             photo.parse(agent, photo_data)
             self.images.append(photo)
         if "audio" in data:
-            audio = Audio()
+            audio = TelegramAudio()
             audio.parse(agent, data["audio"])
             self.audios.append(audio)
         if "video" in data:
-            video = Video()
+            video = TelegramVideo()
             video.parse(agent, data["video"])
             self.videos.append(video)
         if "document" in data:
-            document = Document()
+            document = TelegramDocument()
             document.parse(agent, data["document"])
             self.documents.append(document)
         if "location" in data:
-            location = Location(data["location"]["longitude"], data["location"]["latitude"])
-            location.parse(data["location"])
+            location = TelegramLocation(data["location"]["longitude"], data["location"]["latitude"])
+            location.parse(agent, data["location"])
             self.locations.append(location)
         self.raw = data
 
 
-class Audio(botovod.Attachment):
+class TelegramAudio(Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class Document(botovod.Attachment):
+class TelegramDocument(Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class PhotoSize(botovod.Attachment):
+class TelegramPhotoSize(Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class Video(botovod.Attachment):
+class TelegramVideo(Attachment):
     def parse(self, agent, data):
         response = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url % (agent.token, response)
         self.raw = data
 
 
-class Location(botovod.Location):
+class TelegramLocation(Location):
     def parse(self, agent, data):
         self.longitude = data["longitude"]
         self.latitude = data["latitiude"]

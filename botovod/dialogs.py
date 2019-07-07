@@ -5,8 +5,9 @@ import logging
 
 
 class Dialog:
-    def __init__(self, dbdriver_class):
+    def __init__(self, dbdriver_class, logger: logging.Logger=logging.getLogger()):
         self._dbdriver = dbdriver_class
+        self.logger = logger
     
     def __call__(self, agent, chat, message):
         self.agent = agent
@@ -17,9 +18,9 @@ class Dialog:
             self.follower = self._dbdriver.add_follower(agent, chat)
         dialog_name = self.follower.get_dialog_name()
         if not dialog_name is None and dialog_name != self.__class__.__name__:
-            logging.info("Dialog '%s' not passed, skipping...", self.__class__.__name__)
+            self.logger.info("Dialog '%s' not passed, skipping...", self.__class__.__name__)
             raise NotPassed
-        logging.info("Dialog '%s' passed", self.__class__.__name__)
+        self.logger.info("Dialog '%s' passed", self.__class__.__name__)
         if dialog_name is None:
             self.follower.set_dialog_name(self.__class__.__name__)
         next_step = self.follower.get_next_step()
@@ -35,11 +36,11 @@ class Dialog:
         dialog(self.agent, self.chat, self.message)
 
     def set_next_dialog(self, cls):
-        logging.info("Set next dialog '%s'", cls.__name__)
+        self.logger.info("Set next dialog '%s'", cls.__name__)
         self.follower.set_dialog_name(cls.__name__)
 
     def set_next_step(self, name):
-        logging.info("Set next step '%s'", name)
+        self.logger.info("Set next step '%s'", name)
         self.follower.set_next_step(name)
     
     def reply(self, message):
@@ -88,7 +89,7 @@ class KeyboardPaginator(Dialog):
             buttons.append(self.next_button)
         message.keyboard = Keyboard(*buttons)
         self.reply(message)
-        
+
         self.set_next_step("handle")
 
     def handle(self):
@@ -110,7 +111,7 @@ class KeyboardPaginator(Dialog):
             page_data = data[page*self.limit:(page+1)*self.limit]
             self.action(page_data)
             return
-        
+
         page_data = data[page*self.limit:(page+1)*self.limit]
         message = self.render(page_data)
         buttons = []

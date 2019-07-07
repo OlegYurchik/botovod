@@ -1,139 +1,51 @@
+from __future__ import annotations
+from botovod.agents import Agent
 import logging
-import sys
 
 
+class AgentDict(dict):
+    def __init__(self, botovod: Botovod):
+        self.botovod = botovod
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-logging.basicConfig(stream=sys.stdout,
-                    format="%(asctime)s %(levelname)s %(module)s L%(lineno)s %(message)s")
+    def __setitem__(self, key: str, value: Agent):
+        if key in self:
+            self[key].set_botovod(None)
+        value.botovod = self.botovod
+        value.name = key
+        return super().__setitem__(key, value)
+
+    def __delitem__(self, key: str):
+        self[key].botovod = None
+        self[key].name = None
+        return super().__delitem__(key)
 
 
 class Botovod:
-    def __init__(self, settings: list = []):
-        logging.info("Initialiaze Botovod manager")
-        self.agents = dict()
-        self.handlers = list()
-        for setting in settings:
-            self.add_agent(name=setting["name"], agent=setting["agent"],
-                           settings=setting["settings"])
+    def __init__(self, logger: logging.Logger=logging.getLogger(__name__)):
+        self.agents = AgentDict(self)
+        self.handlers = []
+        self.logger = logger
 
-    def add_agent(self, name: str, agent: str, settings: dict):
-        logging.info("Add agent '%s' - '%s'", agent, name)
-        module = __import__(agent, fromlist=["Agent"])
-        if name in self.agents:
-            logging.error("Agent with name '%s' already exists", name)
-        agent = module.Agent(manager=self, name=name, **settings)
-        self.agents[name] = agent
-        return agent
-
-    def add_handler(self, handler: callable):
-        self.handlers.append(handler)
+        logger.info("Initialiaze Botovod manager")
 
     def start(self, name=None):
-        if not name is None:
-            self.agents[name].start()
+        if not name is None and name not in self.agents:
+            self.logger.error("Botovod have no agent with name '%s'", name)
             return
-        for agent in self.agents.values():
+        agents = self.agents if name is None else {name: self.agents[name]}
+        for name, agent in agents.items():
+            self.logger.info("Botovod starting allagent '%s' with name '%s'", agents[name], name)
             agent.start()
 
     def stop(self, name=None):
-        if not name is None:
-            self.agents[name].stop()
+        if not name is None and name not in self.agents:
+            self.logger.error("Botovod have no agent with name '%s'", name)
             return
-        for agent in self.agents.values():
+        agents = self.agents if name is None else {name: self.agents[name]}
+        for name, agent in agents.items():
+            self.logger.info("Botovod stoping allagent '%s' with name '%s'", agents[name], name)
             agent.stop()
-    
-    def status(self, name):
-        return self.agents[name].running
 
-    def listen(self, name, headers: dict, body: str) -> dict:
+    def listen(self, name: str, headers: dict, body: str) -> dict:
         agent = self.agents[name]
         return agent.listen(headers, body)
-
-
-class Agent:
-    def __init__(self, manager: Botovod, name: str):
-        logging.info("Initialize agent '%s'", name)
-        self.manager = manager
-        self.name = name
-        self.running = False
-    
-    def listen(self, headers: dict, body: str) -> dict:
-        logging.info("Get request for agent '%s' - '%s'", self.name, self.__class__.__name__)
-        from . import utils
-
-        messages = self.parser(None, headers, body)
-        response = None
-        for chat, message in messages:
-            for handler in self.manager.handlers:
-                try:
-                    response = handler(self, chat, message)
-                except utils.NotPassed:
-                    continue
-                break
-        if not response is None:
-            status, headers, body = response
-        else:
-            status, headers, body = self.responser(200, headers, body)
-        return {"status": status, "headers": headers, "body": body}
-    
-    def start(self):
-        raise NotImplementedError
-    
-    def stop(self):
-        raise NotImplementedError
-    
-    def parser(self, status: int, headers: dict, body: str):
-        raise NotImplementedError
-    
-    def responser(self, status: int, headers: dict, body: str):
-        raise NotImplementedError
-    
-    def send_message(self, chat, message, **args):
-        raise NotImplementedError
-
-
-class Entity:
-    def __init__(self):
-        self.raw = dict()
-
-
-class Chat(Entity):
-    def __init__(self, agent: str, id):
-        self.agent = agent
-        self.id = id
-
-
-class Message(Entity):
-    def __init__(self):
-        self.text = None
-        self.images = []
-        self.audios = []
-        self.videos = []
-        self.documents = []
-        self.locations = []
-        self.keyboard = None
-        self.date = None
-        self.raw = dict()
-
-
-class Attachment(Entity):
-    url = None
-    file = None
-
-
-class Location(Entity):
-    def __init__(self, latitude: float, longitude: float):
-        self.latitude = latitude
-        self.longitude = longitude
-
-
-class Keyboard(Entity):
-    def __init__(self, *buttons):
-        self.buttons = buttons
-
-
-class KeyboardButton(Entity):
-    def __init__(self, text):
-        self.text = text

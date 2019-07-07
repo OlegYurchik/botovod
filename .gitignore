@@ -1,8 +1,10 @@
-__pycache__
-.pytest_cache
 *.egg-info
-VENV
+.pytest_cache
+.vscode
+__pycache__
 deploy/build
 deploy/dist
 deploy/pylint.log
 test.py
+venv
+

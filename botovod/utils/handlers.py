@@ -1,9 +1,6 @@
-from . import Agent, Chat, Message
+from botovod.utils.exceptions import NotPassed
+from botovod import Agent, Chat
 import re
-
-
-class NotPassed(Exception):
-    pass
 
 
 def convert_to_text(func):
@@ -115,14 +112,3 @@ def only_chat(chat, cls=Agent):
             return func(agent, chat, message)
         return wrapper
     return decorator
-
-
-class TextStorage:
-    def __init__(self):
-        self.storage = dict()
-    
-    def get(self, key, language="en"):
-        return self.storage[key][language]
-
-    def set(self, **texts: dict):
-        self.storage.update(texts)
