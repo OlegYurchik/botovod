@@ -9,14 +9,16 @@ class AgentDict(dict):
 
     def __setitem__(self, key: str, value: Agent):
         if key in self:
-            self[key].set_botovod(None)
+            del self[key]
         value.botovod = self.botovod
-        value.name = key
+
+        self.botovod.logger.info("Add agent '%s' with name '%s'", value, key)
         return super().__setitem__(key, value)
 
     def __delitem__(self, key: str):
         self[key].botovod = None
-        self[key].name = None
+
+        self.botovod.logger.info("Remove agent '%s' from name '%s'", self[key], key)
         return super().__delitem__(key)
 
 
@@ -26,26 +28,18 @@ class Botovod:
         self.handlers = []
         self.logger = logger
 
-        logger.info("Initialiaze Botovod manager")
+        self.logger.info("Initialiaze Botovod manager")
 
-    def start(self, name=None):
-        if not name is None and name not in self.agents:
-            self.logger.error("Botovod have no agent with name '%s'", name)
-            return
-        agents = self.agents if name is None else {name: self.agents[name]}
-        for name, agent in agents.items():
-            self.logger.info("Botovod starting allagent '%s' with name '%s'", agents[name], name)
+    def start(self):
+        for agent in self.agents.values():
             agent.start()
 
-    def stop(self, name=None):
-        if not name is None and name not in self.agents:
-            self.logger.error("Botovod have no agent with name '%s'", name)
-            return
-        agents = self.agents if name is None else {name: self.agents[name]}
-        for name, agent in agents.items():
-            self.logger.info("Botovod stoping allagent '%s' with name '%s'", agents[name], name)
+    def stop(self):
+        for agent in self.agents.values():
             agent.stop()
 
     def listen(self, name: str, headers: dict, body: str) -> dict:
-        agent = self.agents[name]
-        return agent.listen(headers, body)
+        if name is not None and name not in self.agents:
+            self.logger.error("Botovod have no agent with name '%s'", name)
+            return
+        return self.agents[name].listen(headers, body)

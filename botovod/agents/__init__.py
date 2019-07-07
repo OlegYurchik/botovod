@@ -10,21 +10,15 @@ class Agent:
     def listen(self, headers: dict, body: str) -> dict:
         from botovod.utils.exceptions import NotPassed
 
-        messages = self.parser(None, headers, body)
-        print(messages)
-        response = None
+        messages = self.parser(headers, body)
         for chat, message in messages:
             for handler in self.botovod.handlers:
                 try:
-                    response = handler(self, chat, message)
+                    handler(self, chat, message)
                 except NotPassed:
                     continue
                 break
-        if not response is None:
-            status, headers, body = response
-        else:
-            status, headers, body = self.responser(200, headers, body)
-        return {"status": status, "headers": headers, "body": body}
+        return self.responser(200, headers, body)
 
     def start(self):
         raise NotImplementedError
@@ -32,7 +26,7 @@ class Agent:
     def stop(self):
         raise NotImplementedError
 
-    def parser(self, status: int, headers: dict, body: str):
+    def parser(self, headers: dict, body: str):
         raise NotImplementedError
 
     def responser(self, status: int, headers: dict, body: str):

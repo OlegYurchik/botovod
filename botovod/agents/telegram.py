@@ -1,3 +1,4 @@
+from botovod import utils
 from botovod.agents import Agent, Attachment, Chat, Location, Message
 import json
 import logging
@@ -7,62 +8,46 @@ import time
 
 
 class TelegramAgent(Agent):
-    WEBHOOKS = "webhooks"
+    WEBHOOK = "webhook"
     POLLING = "polling"
-    METHODS = {WEBHOOKS, POLLING}
 
-    url = "https://api.telegram.org/bot%s/%s"
+    url = "https://api.telegram.org/bot{token}/{method}"
 
-    def __init__(self, token, method=POLLING, polling_delay=5, polling_daemon=False,
-                 webhook_url=None, certificate_path=None,
-                 logger: logging.Logger=logging.getLogger(__name__)):
+    def __init__(self, token, method=POLLING, logger: logging.Logger=logging.getLogger(__name__),
+                 **settings):
         super().__init__(logger)
         self.token = token
         self.method = method
 
-        self.polling_delay = polling_delay
-        self.polling_daemon = polling_daemon
-        self.polling_run = False
-        self.polling_thread = None
-
-        self.webhook_url = webhook_url
-        self.certificate_path = certificate_path
+        if method == self.POLLING:
+            self.delay = settings.get("delay", 5)
+            self.daemon = settings.get("daemon", False)
+            self.thread = None
+        else:
+            self.webhook_url = settings["webhook_url"]
+            self.certificate_path = settings.get("certifitate_path")
 
         self.last_update = 0
 
     def start(self):
-        if self.method == "polling":
-            url = self.url % (self.token, "setWebhook")
-            response = requests.get(url)
-            try:
-                if response.status_code != 200 or response.json()["ok"] != True: 
-                    self.logger.error("[%s] Cannot delete webhook. Code: %s. Response: %s",
-                                      self.name, response.status_code, response.text)
-            except:
-                logging.error("[%s] Cannot delete webhook. Code: %s. Response: %s", self.name,
-                              response.status_code, response.text)
-            self.polling_run = True
-            if self.polling_thread and self.polling_thread.is_alive():
-                self.polling_thread.join()
-            self.polling_thread = Thread(target=self.polling_listener, daemon=self.polling_daemon)
-            self.polling_thread.start()
-        elif self.method == "webhook":
-            self.polling_run = False
-            if self.polling_thread and self.polling_thread.is_alive():
-                self.polling_thread.join()
-            self.set_webhook()
+        self.set_webhook()
         self.running = True
 
+        if self.method == self.POLLING:
+            if self.thread and self.thread.is_alive():
+                self.thread.join()
+            self.thread = Thread(target=self.polling_listener, daemon=self.daemon)
+            self.thread.start()
+
     def stop(self):
-        if self.method == "polling":
-            self.polling_run = False
-            self.polling_thread.join()
-            self.polling_thread = None
+        if self.method == self.POLLING:
+            self.thread.join()
+            self.thread = None
         self.running = False
 
-    def parser(self, status: int, headers: dict, body: str):
+    def parser(self, headers: dict, body: str):
         update = json.loads(body)
-        messages = list()
+        messages = []
         if update["update_id"] <= self.last_update:
             return messages
         self.last_update = update["update_id"]
@@ -78,61 +63,48 @@ class TelegramAgent(Agent):
         return messages
 
     def responser(self, status: int, headers: dict, body: str):
-        return 200, dict(), ""
+        return 200, {}, ""
 
     def polling_listener(self):
-        url = self.url % (self.token, "getUpdates")
-        while self.polling_run:
-            messages = list()
+        url = self.url.format(token=self.token, method="getUpdates")
+        while self.running:
             try:
-                if self.last_update:
-                    response = requests.get(url, data={"offset": self.last_update + 1})
-                else:
-                    response = requests.get(url)
+                params = {"offset": self.last_update + 1} if self.last_update > 0 else {}
+                response = requests.get(url, params=params)
                 updates = response.json()["result"]
             except:
-                logging.error("[%s] Get incorrect update. Code: %s. Response: %s", self.name,
-                              response.status_code, response.text)
-                time.sleep(self.polling_delay)
+                self.logger.error("Get incorrect update. Code: %s. Response: %s",
+                                   response.status_code, response.text)
+                time.sleep(self.delay)
                 continue
-            logging.info("[%s] Get update. Code: %s. Response: %s", self.name, response.status_code,
-                         response.text)
+            self.logger.info("Get update. %s updates", len(updates))
             for update in updates:
-                ms = self.parser(response.status_code, response.headers, json.dumps(update))
-                messages.extend(ms)
-            for chat, message in messages:
-                for handler in self.botovod.handlers:
-                    try:
-                        handler(self, chat, message)
-                    except utils.NotPassed as e:
-                        continue
-                    break
-            time.sleep(self.polling_delay)
+                self.listen(response.headers, json.dumps(update))
+            time.sleep(self.delay)
 
     def set_webhook(self):
-        url = self.url % (self.token, "setWebhook")
-        data = dict()
-        files = dict()
-        if not self.webhook_url is None:
+        url = self.url.format(token=self.token, method="setWebhook")
+        data, files = {}, {}
+        if self.method == self.WEBHOOK:
             data["url"] = self.webhook_url
-        if not self.certificate_path is None:
-            files["certificate"] = open(self.certificate_path)
+            if self.certificate_path is not None:
+                files["certificate"] = open(self.certificate_path)
         response = requests.get(url, data=data, files=files)
         if response.status_code != 200:
-            logging.error("[%s] Webhook doesn't set. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Webhook doesn't set. Code: %s; Body: %s",
+                              response.status_code, response.text)
 
     def send_message(self, chat, message):
         if not message.text is None:
-            url = self.url % (self.token, "sendMessage")
+            url = self.url.format(token=self.token, method="sendMessage")
             data = {"chat_id": chat.id, "text": message.text}
-            if not message.keyboard is None:
-                data["reply_markup"] = '{"keyboard":[%s],"resize_keyboard":true}' % ",".join([json.dumps([button.text]) for button in message.keyboard.buttons])
+            # if not message.keyboard is None:
+            #     data["reply_markup"] = '{"keyboard":[%s],"resize_keyboard":true}' % ",".join([json.dumps([button.text]) for button in message.keyboard.buttons])
             data.update(**message.raw)
             response = requests.post(url, data=data)
             if response.status_code != 200:
-                logging.error("[%s] Cannot send message. Code: %s; Body: %s",
-                              self.name, response.status_code, response.text)
+                self.logger.error("Cannot send message. Code: %s; Body: %s", response.status_code,
+                                  response.text)
         for image in message.images:
             self.send_photo(chat, image)
         for audio in  message.audios:
@@ -145,7 +117,7 @@ class TelegramAgent(Agent):
             self.send_location(chat, location)
 
     def send_photo(self, chat, image):
-        url = self.url % (self.token, "sendPhoto")
+        url = self.url.format(token=self.token, method="sendPhoto")
         data = {"chat_id": chat.id}
         if "file_id" in image.raw:
             data["photo"] = image.raw["file_id"]
@@ -159,11 +131,11 @@ class TelegramAgent(Agent):
         else:
             return
         if response.status_code != 200:
-            logging.error("[%s] Cannot send photo. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot send photo. Code: %s; Body: %s", response.status_code,
+                              response.text)
 
     def send_audio(self, chat, audio):
-        url = self.url % (self.token, "sendAudio")
+        url = self.url.format(token=self.token, method="sendAudio")
         data = {"chat_id": chat.id}
         if "file_id" in audio.raw:
             data["audio"] = audio.raw["file_id"]
@@ -177,8 +149,8 @@ class TelegramAgent(Agent):
         else:
             return
         if response.status_code != 200:
-            logging.error("[%s] Cannot send audio. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot send audio. Code: %s; Body: %s", response.status_code,
+                              response.text)
 
     def send_document(self, chat, document):
         url = self.url % (self.token, "sendDocument")
@@ -195,11 +167,11 @@ class TelegramAgent(Agent):
         else:
             return
         if response.status_code != 200:
-            logging.error("[%s] Cannot send document. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot send document. Code: %s; Body: %s", response.status_code,
+                              response.text)
 
     def send_video(self, chat, video):
-        url = self.url % (self.token, "sendVideo")
+        url = self.url.format(token=self.token, method="sendVideo")
         data = {"chat_id": chat.id}
         if "file_id" in video.raw:
             data["video"] = video.raw["file_id"]
@@ -213,24 +185,24 @@ class TelegramAgent(Agent):
         else:
             return
         if response.status_code != 200:
-            logging.error("[%s] Cannot send video. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot send video. Code: %s; Body: %s", response.status_code,
+                              response.text)
 
     def send_location(self, chat, location, **args):
-        url = self.url % (self.token, "sendLocation")
+        url = self.url.format(token=self.token, method="sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
         data.update(**args)
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            logging.error("[%s] Cannot send location. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot send location. Code: %s; Body: %s", response.status_code,
+                              response.text)
 
     def get_file(self, file_id):
-        url = self.url % (self.token, "getFile")
+        url = self.url.format(token=self.token, method="getFile")
         response = requests.get(url, data = {"file_id": file_id})
         if response.status_code != 200:
-            logging.error("[%s] Cannot get file. Code: %s; Body: %s",
-                          self.name, response.status_code, response.text)
+            self.logger.error("Cannot get file. Code: %s; Body: %s", response.status_code,
+                              response.text)
         return response.json()
     """
     def get_me(self):
