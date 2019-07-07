@@ -11,14 +11,16 @@ class AgentDict(dict):
         if key in self:
             del self[key]
         value.botovod = self.botovod
+        value.name = key
 
-        self.botovod.logger.info("Add agent '%s' with name '%s'", value, key)
+        self.botovod.logger.info("[%s:%s] Agent was added to Botovod.", value, key)
         return super().__setitem__(key, value)
 
     def __delitem__(self, key: str):
         self[key].botovod = None
+        self[key].name = None
 
-        self.botovod.logger.info("Remove agent '%s' from name '%s'", self[key], key)
+        self.botovod.logger.info("[%s:%s] Agent was removed from Botovod.", self[key], key)
         return super().__delitem__(key)
 
 
@@ -28,7 +30,7 @@ class Botovod:
         self.handlers = []
         self.logger = logger
 
-        self.logger.info("Initialiaze Botovod manager")
+        logger.info("Initialiaze Botovod.")
 
     def start(self):
         for agent in self.agents.values():
@@ -40,6 +42,6 @@ class Botovod:
 
     def listen(self, name: str, headers: dict, body: str) -> dict:
         if name is not None and name not in self.agents:
-            self.logger.error("Botovod have no agent with name '%s'", name)
+            self.logger.error("Botovod have no agent with name '%s'!", name)
             return
         return self.agents[name].listen(headers, body)

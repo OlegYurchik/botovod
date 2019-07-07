@@ -1,5 +1,5 @@
+from botovod.agents import Agent, Chat
 from botovod.utils.exceptions import NotPassed
-from botovod import Agent, Chat
 import re
 
 

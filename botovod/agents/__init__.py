@@ -5,10 +5,18 @@ class Agent:
     def __init__(self, logger: logging.Logger=logging.getLogger(__name__)):
         self.logger = logger
         self.botovod = None
+        self.name = None
         self.running = False
+
+        logger.info("Initialize agent %s", self)
+
+    def __repr__(self):
+        return self.__class__.__name__
 
     def listen(self, headers: dict, body: str) -> dict:
         from botovod.utils.exceptions import NotPassed
+
+        self.logger.info("[%s:%s] Get updates.", self, self.name)
 
         messages = self.parser(headers, body)
         for chat, message in messages:

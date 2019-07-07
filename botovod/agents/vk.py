@@ -1,5 +1,5 @@
-import botovod
-from botovod import utils
+from botovod.agents import Agent, Chat, Message
+from botovod.utils.exceptions import NotPassed
 import json
 import logging
 import requests
@@ -7,58 +7,67 @@ from threading import Thread
 import time
 
 
-class VkAgent(botovod.Agent):
+class VkAgent(Agent):
+    CALLBACK = "callback"
+    BOT_POLLING = "bot_polling"
+    USER_POLLING = "user_polling"
+
     api_url = "https://api.vk.com/method"
     bot_url = "{server}?act=a_check&key={key}&ts={ts}&wait={wait}"
     user_url = "https://{server}?act=a_check&key={key}&ts={ts}&wait={wait}&mode={mode}&version={version}"
 
-    def __init__(self, manager, name, token, group_id, api_version="5.50", method="callback",confirm_key=None,
-                 secret_key=None, polling_wait=25, polling_delay=5, polling_daemon=False):
-        super().__init__(manager, name)
+    def __init__(self, token: str, group_id: int, api_version: str="5.50", method: str=CALLBACK,
+                 confirm_key: (str, None)=None, secret_key: (str, None)=None, wait: int=25,
+                 delay: int=5, daemon: bool=False,
+                 logger: logging.Logger=logging.getLogger(__name__)):
+        super().__init__()
         self.token = token
         self.group_id = group_id
         self.api_version = api_version
         self.method = method
-        
+
         self.confirm_key = confirm_key
         self.secret_key = secret_key
 
-        self.polling_wait = polling_wait
-        self.polling_delay = polling_delay
-        self.polling_daemon = polling_daemon
+        self.wait = wait
+        self.delay = delay
+        self.daemon = daemon
         
-        self.polling_key = None
-        self.polling_server = None
-        self.polling_ts = None
-        self.polling_thread = None
-        self.polling_run = False
-
-        manager.add_handler(confirm)
+        self.key = None
+        self.server = None
+        self.ts = None
+        self.thread = None
 
     def start(self):
-        if self.method == "bot_polling":
-            self.polling_auth()
-            self.polling_run = True
-            
-            if self.polling_thread and self.polling_thread.is_alive():
-                self.polling_thread.join()
-            self.polling_thread = Thread(target=self.polling_listener, daemon=self.polling_daemon)
-            self.polling_thread.start()
-        elif self.method == "user_polling":
-            pass
-        elif self.method == "callback":
-            pass
+        self.logger.info("[%s:%s] Starting agent...", self, self.name)
+
         self.running = True
 
+        if self.method == self.BOT_POLLING:
+            self.polling_auth()
+
+            if self.thread and self.thread.is_alive():
+                self.thread.join()
+            self.thread = Thread(target=self.polling_listener, daemon=self.daemon)
+            self.thread.start()
+            self.logger.info("[%s:%s] Started by bot polling.", self, self.name)
+        elif self.method == self.USER_POLLING:
+            pass
+        elif self.method == self.CALLBACK:
+            pass
+
     def stop(self):
-        if self.method == "bot_polling" or self.method == "user_polling":
-            self.polling_run = False
-            self.polling_thread.join()
-            self.polling_thread = None
+        self.logger.info("[%s:%s] Stopping agent...", self, self.name)
+
+        if self.method in (self.BOT_POLLING, self.USER_POLLING):
+            self.thread.join()
+            self.thread = None
         self.running = False
 
+        self.logger.info("[%s:%s] Agent stopped.", self, self.name)
+
     def parser(self, status: int, headers: dict, body):
-        messages = list()
+        messages = []
         if body["type"] == "message_new":
             data = body["object"]
             chat = VkChat(data["from_id"])
@@ -82,15 +91,15 @@ class VkAgent(botovod.Agent):
         response = self.api_method(name="messages.send", params=params)
 
     def polling_listener(self):
-        while self.polling_run:
-            url = self.bot_url.format(server=self.polling_server, key=self.polling_key, ts=self.polling_ts,
-                                      wait=self.polling_wait)
+        while self.running:
+            url = self.bot_url.format(server=self.polling_server, key=self.key, ts=self.ts,
+                                      wait=self.wait)
             messages = list()
             try:
                 response = requests.get(url)
                 data = response.json()
             except:
-                time.sleep(self.polling_delay)
+                time.sleep(self.delay)
                 logging.error("[%s] Cannot update. Code: %s. Response: %s", self.name,
                               response.status_code, response.text)
                 continue
@@ -102,7 +111,7 @@ class VkAgent(botovod.Agent):
                                 response.status_code, response.text)
                 if 2 <= failed <= 3:
                     self.polling_auth()
-                time.sleep(self.polling_delay)
+                time.sleep(self.delay)
                 continue
             self.polling_ts = data["ts"]
             
@@ -110,13 +119,13 @@ class VkAgent(botovod.Agent):
                 ms = self.parser(response.status_code, response.headers, update)
                 messages.extend(ms)
             for chat, message in messages:
-                for handler in self.manager.handlers:
+                for handler in self.botovod.handlers:
                     try:
                         handler(self, chat, message)
-                    except utils.NotPassed as e:
+                    except NotPassed:
                         continue
                     break
-            time.sleep(self.polling_delay)
+            time.sleep(self.delay)
 
     def polling_auth(self):
         response = self.api_method(name="groups.getLongPollServer", params={"group_id": self.group_id})
@@ -140,22 +149,12 @@ class VkAgent(botovod.Agent):
             return requests.get(url)
 
 
-@utils.only_agent(VkAgent)
-def confirm(agent, chat, message):
-    data = json.loads(message.text)
-    if data["type"] == "confirmation":
-        pass
-    else:
-        pass
-    return 200, dict(), "kishkish"
-
-
-class VkChat(botovod.Chat):
+class VkChat(Chat):
     def __init__(self, id):
         super().__init__("botovod.agents.vk", id)
 
 
-class VkMessage(botovod.Message):
+class VkMessage(Message):
     def parse(self, data):
         self.text = data["text"]
         self.raw = data
