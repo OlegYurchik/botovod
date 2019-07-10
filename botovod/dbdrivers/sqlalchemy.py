@@ -101,18 +101,19 @@ class Follower(dbdrivers.Follower, Common, Base):
     async def a_get_chat(self) -> Chat:
         pass
 
-    def get_dialog_name(self) -> str:
+    def get_dialog(self) -> str:
         return self.dialog
 
-    async def a_get_dialog_name(self) -> str:
+    async def a_get_dialog(self) -> str:
         pass
 
     @add()
-    def set_dialog_name(self, name: str):
+    def set_dialog(self, name: str):
         self.dialog = name
+        self.set_next_step()
         return self
 
-    async def a_set_dialog_name(self, name: str):
+    async def a_set_dialog(self, name: str):
         pass
 
     def get_next_step(self) -> str:

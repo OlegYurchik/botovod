@@ -17,12 +17,12 @@ class Dialog:
         if dialog.follower is None:
             dialog.follower = agent.botovod.dbdriver.add_follower(agent, chat)
 
-        dialog_name = dialog.follower.get_dialog_name()
+        dialog_name = dialog.follower.get_dialog()
         if dialog_name is not None and dialog_name != cls.__name__:
             raise NotPassed
         
         if dialog_name is None:
-            dialog.follower.set_dialog_name(cls.__name__)
+            dialog.follower.set_dialog(cls.__name__)
         next_step = dialog.follower.get_next_step()
         if next_step:
             getattr(dialog, next_step)()
