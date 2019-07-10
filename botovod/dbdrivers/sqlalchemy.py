@@ -1,4 +1,7 @@
-from botovod import Attachment, Chat, Location, Message as BotoMessage, dbdrivers
+from __future__ import annotations
+from botovod import dbdrivers
+from botovod.agents import (Agent, Attachment, Audio, Chat, Document, Image, Location,
+                            Message as BotoMessage, Video)
 from datetime import datetime
 import json
 from json import JSONDecodeError
@@ -7,19 +10,73 @@ from sqlalchemy import Column, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.types import Boolean, Date, Integer, DateTime, String, Text
-
-
-def commit(func):
-    def wrapper(*args, **kwargs):
-        result = func(*args, **kwargs)
-        if not result is None:
-            DBDriver.session.add_all(result)
-        DBDriver.session.commit()
-        return result
-    return wrapper
+from typing import Any, Callable, Iterable
 
 
 Base = declarative_base()
+
+
+def attachment_render(attachment: Attachment) -> dict:
+    return {
+        "url": attachment.url,
+        "file": attachment.file,
+        "raw": attachment.raw,
+    }
+
+
+def attachment_parser(data: dict) -> Attachment:
+    attachment = Attachment
+    attachment.url = data["url"]
+    attachment.file = data["file"]
+    attachment.raw = data["raw"]
+    return attachment
+
+
+def location_render(location: Location) -> dict:
+    return {
+        "longitude": location.longitude,
+        "latitude": location.latitude,
+        "raw": location.raw,
+    }
+
+
+def location_parser(data: dict) -> Location:
+    location = Location(
+        longitude = data["longitude"],
+        latitude = data["latitude"],
+    )
+    location.raw = data["raw"]
+    return location
+
+
+def add(one: bool=True):
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            if result is not None:
+                if one:
+                    DBDriver.session.add(result)
+                else:
+                    DBDriver.session.add_all(result)
+            DBDriver.session.commit()
+            return result
+        return wrapper
+    return decorator
+
+
+def delete(one: bool=True):
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            if result is not None:
+                if one:
+                    DBDriver.session.delete(result)
+                else:
+                    DBDriver.session.delete_all(result)
+            DBDriver.session.commit()
+            return result
+        return wrapper
+    return decorator
 
 
 class Common:
@@ -28,74 +85,95 @@ class Common:
     created_at = Column(DateTime, default=datetime.now, nullable=False)
 
 
-class Bot(Common, Base):
-    __tablename__ = "bots"
-
-    name = Column(String(64), nullable=False, unique=True)
-    agent = Column(String(64), nullable=False)
-    settings = Column(Text, nullable=False, default="{}")
-    followers = relationship("Follower", back_populates="bot", uselist=True)
-
-
 class Follower(dbdrivers.Follower, Common, Base):
-    __tablename__ = "followers"
+    __tablename__ = "botovod_followers"
 
     chat = Column(String(64), nullable=False)
-    bot_id = Column(Integer, ForeignKey(f"{Bot.__tablename__}.id"), nullable=False)
-    bot = relationship("Bot", back_populates="followers", uselist=False)
+    bot = Column(String(64), nullable=False)
     dialog = Column(String(64))
     next_step = Column(String(64))
     data = Column(Text, nullable=False, default="{}")
     messages = relationship("Message", back_populates="follower", uselist=True)
 
-    def get_chat(self):
-        return Chat(self.bot.agent, self.chat)
+    def get_chat(self) -> Chat:
+        return Chat(self.bot, self.chat)
 
-    def get_dialog_name(self):
+    async def a_get_chat(self) -> Chat:
+        pass
+
+    def get_dialog_name(self) -> str:
         return self.dialog
 
-    @commit
-    def set_dialog_name(self, name):
-        self.dialog = name
-        return [self]
+    async def a_get_dialog_name(self) -> str:
+        pass
 
-    def get_next_step(self):
+    @add()
+    def set_dialog_name(self, name: str):
+        self.dialog = name
+        return self
+
+    async def a_set_dialog_name(self, name: str):
+        pass
+
+    def get_next_step(self) -> str:
         return self.next_step
 
-    @commit
-    def set_next_step(self, next_step):
-        self.next_step = next_step
-        return [self]
+    async def a_get_next_step(self) -> str:
+        pass
 
-    def get_history(self, after_date=None, before_date=None, input=None, text=None):
+    @add()
+    def set_next_step(self, next_step: str="start"):
+        self.next_step = next_step
+        return self
+
+    async def a_set_next_step(self, next_step: str="start"):
+        pass
+
+    def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
+                    input: (bool, None)=None, text: (str, None)=None) -> Iterable[BotoMessage]:
         messages = self.messages
-        if not after_date is None:
+        if after_date is not None:
             messages = messages.filter(Message.date >= after_date)
-        if not before_date is None:
+        if before_date is not None:
             messages = messages.filter(Message.date <= before_date)
-        if not input is None:
+        if input is not None:
             messages = messages.filter(Message.input == input)
-        if not text is None:
+        if text is not None:
             messages = messages.filter(Message.text.like(text))
         return [message.to_object() for message in messages.all()]
 
-    @commit
-    def add_history(self, message, input=True):
-        return [Message(
+    async def a_get_history(self, after_date: (datetime, None)=None,
+                            before_date: (datetime, None)=None, input: (bool, None)=None,
+                            text: (str, None)=None) -> Iterable[BotoMessage]:
+        pass
+
+    @add()
+    def add_history(self, date: datetime, text: (str, None)=None, images: Iterable[Image]=[],
+                    audios: Iterable[Audio]=[], videos: Iterable[Video]=[],
+                    documents: Iterable[Document]=[], locations: Iterable[Location]=[],
+                    raw: Any=None, input: bool=True):
+        return Message(
             follower_id = self.id,
             input = input,
-            text = message.text,
-            images = json.loads([attachment_render(image) for image in message.images]),
-            audios = json.loads([attachment_render(audio) for audio in message.audios]),
-            videos = json.loads([attachment_render(video) for video in message.videos]),
-            documents = json.loads([attachment_render(document) for document in message.documents]),
-            locations = json.loads([location_render(location) for location in message.locations]),
-            raw = json.loads(message.raw),
-            date = message.date,
-        )]
+            text = text,
+            images = json.loads([attachment_render(image) for image in images]),
+            audios = json.loads([attachment_render(audio) for audio in audios]),
+            videos = json.loads([attachment_render(video) for video in videos]),
+            documents = json.loads([attachment_render(document) for document in documents]),
+            locations = json.loads([location_render(location) for location in locations]),
+            raw = json.loads(raw),
+            date = date,
+        )
 
-    @commit
-    def clear_history(self, after_date=None, before_date=None, input=None, text=None):
+    async def a_add_history(self, date: datetime, text: (str, None)=None,
+                            images: Iterable[Image]=[], audios: Iterable[Audio]=[],
+                            videos: Iterable[Video]=[], documents: Iterable[Document]=[],
+                            locations: Iterable[Location]=[], raw: Any=None, input: bool=True):
+        pass
+
+    @delete(one=False)
+    def clear_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
+                      input: (datetime, None)=None, text: (str, None)=None):
         messages = self.messages
         if not after_date is None:
             messages = messages.filter(Message.date >= after_date)
@@ -105,44 +183,57 @@ class Follower(dbdrivers.Follower, Common, Base):
             messages = messages.filter(Message.input == input)
         if not text is None:
             messages = messages.filter(Message.text.like(text))
-        messages.delete()
         return messages
 
-    def get_value(self, name):
+    async def a_clear_history(self, after_date: (datetime, None)=None,
+                              before_date: (datetime, None)=None, input: (datetime, None)=None,
+                              text: (str, None)=None):
+        pass
+
+    def get_value(self, name: str):
         try:
             return json.loads(self.data)[name]
         except KeyError:
-            logging.warning("Value '%s' doesn't exist for follower %s %s", name, self.bot.agent,
+            logging.warning("Value '%s' doesn't exist for follower %s %s", name, self.bot,
                             self.chat)
         except JSONDecodeError:
             logging.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
-                          self.bot.agent, self.chat)
+                          self.bot, self.chat)
 
-    @commit
-    def set_value(self, name, value):
+    async def a_get_value(self, name: str):
+        pass
+
+    @add()
+    def set_value(self, name: str, value: str):
         try:
             data = json.loads(self.data)
         except JSONDecodeError:
-            logging.error("Incorrect json structure for follower %s %s", self.bot.agent, self.chat)
+            logging.error("Incorrect json structure for follower %s %s", self.bot, self.chat)
             data = dict()
         data[name] = value
         self.data = json.dumps(data)
-        return [self]
+        return self
 
-    @commit
-    def delete_value(self, name):
+    async def a_set_value(self, name: str, value: str):
+        pass
+
+    @delete()
+    def delete_value(self, name: str):
         data = json.loads(self.obj.data)
         try:
             del data[name]
         except KeyError:
             logging.warning("Cannot delete value '%s' for follower %s %s - doesn't exist", name,
-                            self.bot.agent, self.chat)
+                            self.bot, self.chat)
         self.data = json.dumps(data)
-        return [self]
+        return self
+
+    async def a_delete_value(self, name: str):
+        pass
 
 
 class Message(Common, Base):
-    __tablename__ = "messages"
+    __tablename__ = "botovod_messages"
 
     follower_id = Column(Integer, ForeignKey(f"{Follower.__tablename__}.id"), nullable=False)    
     follower = relationship("Follower", back_populates="messages", uselist=False)
@@ -170,11 +261,12 @@ class Message(Common, Base):
 
 class DBDriver(dbdrivers.DBDriver):
     @classmethod
-    def connect(cls, type, database, host=None, username=None, password=None, debug=False):
+    def connect(cls, type: str, database: str, host: (str, int, None)=None,
+                username: (str, None)=None, password: (str, None)=None, debug: bool=False):
         string = f"{type}://"
-        if not username is None and not password is None:
+        if username is not None and password is not None:
             string = string + f"{username}:{password}@"
-        if not host is None:
+        if host is not None:
             string = string + f"{host}/"
         string = string + database
         cls.engine = create_engine(string, echo=debug)
@@ -185,56 +277,36 @@ class DBDriver(dbdrivers.DBDriver):
         cls.session = Session()
 
     @classmethod
-    def get_follower(cls, agent, chat):
-        follower = cls.session.query(Follower).filter(Follower.bot.name == agent.name)
+    async def a_connect(cls, type: str, database: str, host: (str, int, None)=None,
+                        username: (str, None)=None, password: (str, None)=None, debug: bool=False):
+        pass
+
+    @classmethod
+    def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
+        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
         return follower.filter(Follower.chat == chat.id).first()
 
-    @commit
     @classmethod
-    def add_follower(cls, agent, chat):
-        bot = cls.session.query(Bot).filter(name=agent.name).first()
-        return Follower(
-            chat=chat.id,
-            bot_id=bot.id,
-        )
+    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Follower:
+        pass
 
-    @commit
     @classmethod
-    def delete_follower(cls, agent, chat):
-        follower = cls.session.query(Follower).filter(Follower.agent == agent.__class__.__name__)
-        follower = follower.filter(Follower.chat == chat.id)
-        follower.delete()
+    @add()
+    def add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+        follower = Follower(chat=chat.id, bot=agent.name)
         return follower
 
+    @classmethod
+    async def a_add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+        pass
 
-def attachment_render(attachment):
-    return {
-        "url": attachment.url,
-        "file": attachment.file,
-        "raw": attachment.raw,
-    }
+    @classmethod
+    @delete()
+    def delete_follower(cls, agent: Agent, chat: Chat):
+        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
+        follower = follower.filter(Follower.chat == chat.id)
+        return follower
 
-
-def attachment_parser(data):
-    attachment = Attachment
-    attachment.url = data["url"]
-    attachment.file = data["file"]
-    attachment.raw = data["raw"]
-    return attachment
-
-
-def location_render(location):
-    return {
-        "longitude": location.longitude,
-        "latitude": location.latitude,
-        "raw": location.raw,
-    }
-
-
-def location_parser(data):
-    location = Location(
-        longitude = data["longitude"],
-        latitude = data["latitude"],
-    )
-    location.raw = data["raw"]
-    return location
+    @classmethod
+    async def a_delete_follower(cls, agent: Agent, chat: Chat):
+        pass

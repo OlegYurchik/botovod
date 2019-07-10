@@ -1,6 +1,8 @@
 from __future__ import annotations
 from botovod.agents import Agent
+from botovod.dbdrivers import DBDriver 
 import logging
+from typing import Dict, Tuple
 
 
 class AgentDict(dict):
@@ -25,7 +27,9 @@ class AgentDict(dict):
 
 
 class Botovod:
-    def __init__(self, logger: logging.Logger=logging.getLogger(__name__)):
+    def __init__(self, dbdriver: (DBDriver, None)=None,
+                 logger: logging.Logger=logging.getLogger(__name__)):
+        self.dbdriver = dbdriver
         self.agents = AgentDict(self)
         self.handlers = []
         self.logger = logger
@@ -36,12 +40,28 @@ class Botovod:
         for agent in self.agents.values():
             agent.start()
 
+    async def a_start(self):
+        for agent in self.agents.values():
+            await agent.a_start()
+
     def stop(self):
         for agent in self.agents.values():
             agent.stop()
 
-    def listen(self, name: str, headers: dict, body: str) -> dict:
+    async def a_stop(self):
+        for agent in self.agents.values():
+            await agent.a_stop()
+
+    def listen(self, name: str, headers: Dict[str, str],
+               body: str) -> (Tuple[int, Dict[str, str], str], None):
         if name is not None and name not in self.agents:
             self.logger.error("Botovod have no agent with name '%s'!", name)
             return
         return self.agents[name].listen(headers, body)
+
+    async def a_listen(self, name: str, headers: Dict[str, str],
+                       body: str) -> (Tuple[int, Dict[str, str], str], None):
+        if name is not None and name not in self.agents:
+            self.logger.error("Botovod have no agent with name '%s'!", name)
+            return
+        return await self.agents[name].a_listen(headers, body)

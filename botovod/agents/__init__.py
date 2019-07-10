@@ -1,4 +1,7 @@
+from __future__ import annotations
+import asyncio
 import logging
+from typing import Any, Dict, Iterator, List, Tuple
 
 
 class Agent:
@@ -10,10 +13,10 @@ class Agent:
 
         logger.info("Initialize agent %s", self)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.__class__.__name__
 
-    def listen(self, headers: dict, body: str) -> dict:
+    def listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
         from botovod.utils.exceptions import NotPassed
 
         self.logger.info("[%s:%s] Get updates.", self, self.name)
@@ -26,31 +29,68 @@ class Agent:
                 except NotPassed:
                     continue
                 break
-        return self.responser(200, headers, body)
+        return self.responser(headers, body)
+
+    async def a_listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
+        from botovod.utils.exceptions import NotPassed
+
+        self.logger.info("[%s:%s] Get updates.", self, self.name)
+
+        messages = await self.a_parser(headers, body)
+        for chat, message in messages:
+            for handler in self.botovod.handlers:
+                try:
+                    await handler(self, chat, message)
+                except NotPassed:
+                    continue
+                break
+        return await self.a_responser(headers, body)
 
     def start(self):
+        raise NotImplementedError
+
+    async def a_start(self):
         raise NotImplementedError
 
     def stop(self):
         raise NotImplementedError
 
-    def parser(self, headers: dict, body: str):
+    async def a_stop(self):
         raise NotImplementedError
 
-    def responser(self, status: int, headers: dict, body: str):
+    def parser(self, headers: Dict[str, str], body: str) -> List[Tuple(Chat, Message)]:
         raise NotImplementedError
 
-    def send_message(self, chat, message, **args):
+    async def a_parser(self, headers: Dict[str, str], body: str) -> List[Tuple(Chat, Message)]:
+        raise NotImplementedError
+
+    def responser(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
+        raise NotImplementedError
+
+    async def a_responser(self, headers: Dict[str, str],
+                          body: str) -> Tuple[int, Dict[str, str], str]:
+        raise NotImplementedError
+
+    def send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
+                     audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
+                     videos: Iterator[Video]=[], locations: Iterator[Location]=[],
+                     keyboard: (Keyboard, None)=None, raw: Any=None):
+        raise NotImplementedError
+
+    async def a_send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
+                             audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
+                             videos: Iterator[Video]=[], locations: Iterator[Location]=[],
+                             keyboard: (Keyboard, None)=None):
         raise NotImplementedError
 
 
 class Entity:
     def __init__(self):
-        self.raw = dict()
+        self.raw = {}
 
 
 class Chat(Entity):
-    def __init__(self, agent: str, id):
+    def __init__(self, agent: Agent, id: str):
         self.agent = agent
         self.id = id
 
@@ -65,12 +105,28 @@ class Message(Entity):
         self.locations = []
         self.keyboard = None
         self.date = None
-        self.raw = dict()
+        self.raw = {}
 
 
 class Attachment(Entity):
     url = None
     file = None
+
+
+class Image(Attachment):
+    pass
+
+
+class Audio(Attachment):
+    pass
+
+
+class Video(Attachment):
+    pass
+
+
+class Document(Attachment):
+    pass
 
 
 class Location(Entity):
@@ -80,10 +136,10 @@ class Location(Entity):
 
 
 class Keyboard(Entity):
-    def __init__(self, *buttons):
+    def __init__(self, *buttons: Tuple[KeyboardButton]):
         self.buttons = buttons
 
 
 class KeyboardButton(Entity):
-    def __init__(self, text):
+    def __init__(self, text: str):
         self.text = text

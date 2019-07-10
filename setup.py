@@ -4,7 +4,7 @@ from os.path import join, dirname
 
 setup(
     name = "botovod",
-    version = "0.1",
+    version = "0.1.1",
     
     author = "Oleg Yurchik",
     author_email = "oleg.yurchik@protonmail.com",
@@ -12,7 +12,8 @@ setup(
     
     description = "",
     long_description = open(join(dirname(__file__), "README.md")).read(),
+    long_description_content_type = "text/markdown",
     
     packages = find_packages(),
-    install_requires = ["requests"],
+    install_requires = ["aiofiles", "aiohttp", "requests"],
 )
