@@ -5,151 +5,304 @@ https://github.com/OlegYurchik/botovod/blob/master/LICENSE)
 https://www.python.org/)
 [![paypal](https://img.shields.io/badge/-PayPal-blue.svg)](
 https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QEZ85BDKJCM4E)
-
-### Description
+## Description
 This is a simple and easy-to-use library for interacting with the Instagram. The library works
 through the web interface of the Instagram and does not depend on the official API
 
 User Guide
 =================
-
 * [Getting Started](#getting-started)
-  * [Basic Installation](#basic-installation)
-  * [Installation via Virtualenv](#installation-via-virtualenv)
-* [Quick Start](#quick-start)
-* [Objects](#objects)
-  * [Botovod](#botovod)
-  * [Agent](#agent)
-  * [Chat](#chat)
-  * [Message](#message)
-  * [Attachment](#attachment)
-  * [Location](#location)
-* [Agents](#agents)
-  * [Telegram](#telegram)
+  * [Installation from Pip][#installation-from-pip]
+  * [Installation from GitHub](#installation-from-github)
+  * [Quick Start](#quick-start)
+* [Documentation](#documentation)
+  * [botovod](#botovod)
+    * [botovod.Botovod](#botovod-botovod)
+    * [botovod.dialogs](#botovod-dialogs)
+      * [botovod.dialogs.Dialog](#botovod-dialogs-dialog)
+    * [botovod.agents](#botovod-agents)
+      * [botovod.agents.Agent](#botovod-agents-agent)
+      * [botovod.agents.Entity](#botovod-agents-entity)
+      * [botovod.agents.Chat](#botovod-agents-chat)
+      * [botovod.agents.Message](#botovod-agents-message)
 * [Handlers](#handlers)
 * [Examples](#examples)
 * [Help the author](#help-the-author)
   * [Contribute repo](#contribute-repo)
   * [Donate](#donate)
-
 ## Getting Started
-
-## Basic Installation
-
-To basic installation you should have git, python3 (prefer python3.6 or later), pip (optionally) in
-your system
-
+### Installation from Pip
+For installation botovod library from pip you should have pip with python (prefer python3.6 or
+later)
 ```bash
-1. git clone https://github.com/OlegYurchik/botovod.git
-2. cd botovod
-3. pip install .
-or
-3. python setup.py install
-```  
-
-## Installation via Virtualenv
-
-To installation via Virtualenv, you should have git, python3 (prefer python3.6 or later), pip
-(optionally) and virtualenv in your system
-
-```bash
-1. git clone https://github.com/OlegYurchik/botovod.git
-2. cd botovod
-3. source venv/bin/activate
-4. pip install .
-or
-4. python setup.py install
-5. deactivate
+pip install botovod
 ```
-
-## Quick Start
-
+### Installation from GitHub
+To basic installation from GitHub repository you should have git, python3 (prefer python3.6 or
+later), pip (optionally) in your system
+```bash
+git clone https://github.com/OlegYurchik/botovod.git
+cd botovod
+pip install .
+```
+or
+```bash
+git clone https://github.com/OlegYurchik/botovod.git
+cd botovod
+python setup.py install
+```
+### Quick Start
 After installation, you can use the library in your code. Below is a sneak example of using the
 library
-
 ```python3
-from botovod import Botovod, Message
+from botovod import Botovod
+from botovod.agents.telegram import TelegramAgent
 
-def handler(agent, messsage):
-    agent.send_message(event)
 
-settings = [
-    {"name": "telegram", "agent": "botovod.agents.telegram", 
-     "settings": {"token": "your-telegram-token", "method": "polling"}},
-]
-botovod = Botovod(settings)
-botovod.add_handler(handler)
-botovod.start("telegram")
+def echo(agent, chat, messsage):
+    agent.send_message(chat, text=message.text)
+
+
+botovod = Botovod()
+botovod.handlers.append(echo)
+
+telegram_agent = TelegramAgent(token="your-telegram-token", method="polling)
+botovod.agents["telegram"] = telegram_agent
+
+botovod.start()
 ```
-
 This code setup and run Telegram echo-bot by polling
+```python3
+from botovod import Botovod
+from botovod.agents.telegram import TelegramAgent
+from botovod.dbdrivers.sqlalchemy import DBDriver
+from botovod.dialogs import Dialog
 
-## Objects
 
-## Botovod
+class RegisterDialog(Dialog):
+    def start(self):
+        self.reply(text="Hello, my friend!")
+        self.reply(text="What is your name?")
+        self.set_next_step(self.what_name)
 
-class botovod.Botovod
+    def what_name(self):
+        name = self.message.text
+        self.follower.set_value("name", name)
+        self.reply(text="Nice to meet you, %s. What would you want?" % name)
+        self.set_next_step(self.menu)
 
-* __init__(settings: dict)
+    def menu(self):
+        pass
+        # your code
 
-This method get settings about bots for creating it
 
-* add_handler(handler: function)
+botovod = Botovod(DBDriver(engine="sqlite", database="file.mdb"))
+botovod.handlers.append(RegisterDialog)
 
-Add new handler to botovod
+telegram_agent = TelegramAgent(token="your-telegram-token")
+botovod.agents["telegram"] = telegram_agent
 
-* start(name=None: string)
+botovod.start()
+```
+This code setup and run telegram code which working with database and followers
+## Documentation
+### botovod
+**package botovod**
+### botovod.AgentDict
+**class botovod.AgentDict**
+#### Attributes
+* botovod: botovod.Botovod
 
-If name not is None - start bot with this name else start all bots
+Botovod object
+#### Methods
+* \_\_init\_\_(self, botovod: botovod.Botovod)
 
-* stop(name=None: string)
+Constructor for AgentDict
+* \_\_setitem\_\_(self, key: str, value: botovod.agents.Agent)
 
-If name not is None - stop bot with this name else stop all bots
-        
-* listen(name: string, headers: dict, body: string): {"status": int, "headers": dict, "body": string}
+Setting agents like a dict
 
-Method for getting requests from messangers and handle it
+* \_\_delitem\_\_(self, key: str)
 
-## Agent
+Deleting agents like a dict
+### botovod.Botovod
+**class botovod.Botovod**
+#### Attributes
+* dbdriver: botovod.dbdrivers.DBDriver or None
 
-class botovod.Agent
+Driver for working with database (for save data about followers and dialogs)
+* agents: botovod.AgentDict
 
-* __init__(manager: Botovod, name: string):
+Dictionary for bots agents
+* handlers: list
+
+List with message and event handlers
+* logger: logging.Logger
+Logger
+#### Methods
+* \_\_init\_\_(self, dbdriver: (DBDriver, None)=None, logger:
+logging.Logger=logging.getLogger(__name__))
+
+This method initial botovod object
+* start(self)
+
+Starting all agents in botovod
+* a_start(self)
+
+Coroutine. Starting all agents in botovod
+* stop(self)
+
+Stopping all agents in botovod
+* a_stop(self)
+
+Coroutine. Stopping all agents in botovod
+* listen(selfname: str, headers: dict, body: string) -> (int, dict, str) or None
+
+Method, providing for webservers for listening requests from messengers servers and handle it.
+* a_listen(self, name: str, headers: dict, body: string) -> (int, dict, str} or None
+
+Coroutine, providing for webservers for listening requests from messengers servers and handle it.
+### botovod.dialogs
+**module botovod.dialogs**
+### botovod.dialogs.Dialog
+**class botovod.dialogs.Dialog**
+#### Attributes
+* agent: botovod.agents.Agent
+
+Agent which get message
+* chat: botovod.agents.Chat
+
+Chat
+* message: botovod.agents.Message
+
+Message
+* follower: botovod.dbdrivers.Folower
+
+Follower
+#### Methods
+* \_\_init\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
+botovod.agents.Message)
+
+Constructor for creating dialog object
+* \_\_new\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
+botovod.agents.Message)
+
+Method for handling request
+* reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
+audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
+videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
+keyboard: botovod.agents.Keyboard or None=None, raw=None)
+
+Method for replying to message
+* a_reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
+audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
+videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
+keyboard: botovod.agents.Keyboard or None=None, raw=None)
+
+Corotuine for replying to message
+* set_next_step(self, function: Callable)
+
+Method for setting next function for handling message in dialog
+* a_set_next_step(self, function: Callable)
+
+Coroutine for setting next function for handling message in dialog
+* start(self)
+
+Abstract method or coroutine for handling first message from request
+### botovod.agents
+**package botovod.agents**
+### botovod.agents.Agent
+**class botovod.agent.Agent**
+#### Attributes
+* botovod: botovod.Botovod
+
+Botovod object
+* name: str
+
+Agent name in botovod
+* running: bool
+
+Varibale which True if agent is running else False
+* logger: logging.Logger
+
+Logger
+#### Methods
+* \_\_init\_\_(self, logger: logging.Logger=logging.getLogger(__name__)):
 
 Agent constructor
+* \_\_repr\_\_(self) -> str
 
-* listen(headers: dict, body: string):
+Returning name of class
+* listen(self, headers: dict, body: string) -> (int, dict, str) or None:
 
-Method for getting requests from agent messanger and handle it 
+Method for getting requests from agent messenger and handle it
+* a_listen(self, headers: dict, body: string) -> (int, dict, str) or None:
 
-* start():
+Coroutine for getting requests from agent messenger and handler it
+* start(self):
 
-Abstract method for run bot
-    
-* stop():
+Abstract method for run agent
+* a_start(self):
 
-Abstract method for stop bot
-    
-* parser(status: int, headers: dict, body: string): dict(Chat=Message)
+Abstract coroutine for run agent
+* stop(self):
 
-Abstract method for parsing request and return dict(Chat=Message)
-    
-* responser(): dict("status": int, "headers": dict, "body": string)
+Abstract method for stop agent
+* a_stop(self):
 
-Abstract method who return dict with info for response to messanger
+Abstract coroutine for stop agent
+* parser(self, headers: dict, body: str) -> list[tuple(Chat, Message))
 
-* send_message(chat: Chat, message: Message)
+Abstract method for parsing request and return list[tuple(Chat, Message))
+* a_parser(self, headers: dict, body: str) -> list[tuple(Chat, Message)]
+
+Abstract coroutine for parsing request and return list[tuple(Chat, Message)]
+* responser(self, headers: dict, body: str) -> (int, dict, str)
+
+Abstract method who return tuple with info for response to messenger
+* a_responser(self, headers: dict, body: str) -> (int, dict, str)
+
+Abstract coroutine who return tuple with info for response to messenger
+* send_message(self, chat: botovod.agents.Chat, text: str or None=None, images: Iterator of
+botovod.agents.Image=[], audios: Iterator of botovod.agents.Audio]=[], documents: Iterator of
+botovod.agents.Document=[], videos: Iterator of botovod.agents.Video=[], locations: Iterator of
+botovod.agents.Location=[], keyboard: botovod.agents.Keyboard or None=None, raw: dict or None=None)
 
 Abstract method for sending message
+* a_send_message(self, chat: botovod.agents.Chat, text: str or None=None, images: Iterator of
+botovod.agents.Image=[], audios: Iterator of botovod.agents.Audio]=[], documents: Iterator of
+botovod.agents.Document=[], videos: Iterator of botovod.agents.Video=[], locations: Iterator of
+botovod.agents.Location=[], keyboard: botovod.agents.Keyboard or None=None, raw: dict or None=None)
 
-## Chat
+Abstract coroutine for sending message
+### botovod.agents.Entity
+**class botovod.agents.Entity**
+#### Attributes
+* raw: dict
 
-class botovod.Chat
+Dictonary with additional information
+#### Methods
+* \_\_init\_\_(self)
 
-* __init__(agent_cls: class, id: int)
+Constructor for Entity
+### botovod.agents.Chat
+**class botovod.agents.Chat(botovod.agents.Entity)**
+#### Attributes
+* agent: botovod.agents.Agent
+
+Agent for this Chat
+* id: str
+
+Chat ID for this messenger
+#### Nethods
+* \_\_init\_\_(self, agent: botovod.agents.Agent, id: str)
 
 Chat constructor
-
+### botovod.agents.Message
+**class botovod.agents.Message(botovod.agents.Entity)**
+#### Attributes
+=================
+# **NOT UPDATED INFORMATION**
 ## Message
 
 class botovod.Message

@@ -1,6 +1,6 @@
 from botovod.agents import Agent, Audio, Chat, Document, Image, Location, Video
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any, Dict, Iterable
 
 
 class Follower:
@@ -64,6 +64,12 @@ class Follower:
                               text: (str, None)=None):
         raise NotImplementedError
 
+    def get_values(self) -> Dict[str, str]:
+        raise NotImplementedError
+
+    async def a_get_values(self) -> Dict[str, str]:
+        raise NotImplementedError
+
     def get_value(self, name: str) -> str:
         raise NotImplementedError
 
@@ -80,6 +86,12 @@ class Follower:
         raise NotImplementedError
 
     async def a_delete_value(self, name: str):
+        raise NotImplementedError
+
+    def clear_values(self):
+        raise NotImplementedError
+
+    async def a_clear_values(self):
         raise NotImplementedError
 
 

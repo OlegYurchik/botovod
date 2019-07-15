@@ -1,21 +1,22 @@
 import json
-from botovod.agents import Agent, Chat, Keyboard, Message
+from botovod.agents import Agent, Audio, Chat, Document, Keyboard, Location, Image, Message, Video
 from botovod.utils.exceptions import NotPassed
 import logging
+from typing import Any, Callable, Iterator
 
 
 class Dialog:
-    def __new__(cls, agent: Agent, chat: Chat, message: Message):
-        if agent.botovod is None or agent.botovod.dbdriver is None:
-            return
+    def __init__(self, agent: Agent, chat: Chat, message: Message):
+        self.agent = agent
+        self.chat = chat
+        self.message = message
+        self.follower = agent.botovod.dbdriver.get_follower(agent, chat)
+        if self.follower is None:
+            self.follower = agent.botovod.dbdriver.add_follower(agent, chat)
 
+    def __new__(cls, agent: Agent, chat: Chat, message: Message):
         dialog = super().__new__(cls)
-        dialog.agent = agent
-        dialog.chat = chat
-        dialog.message = message
-        dialog.follower = agent.botovod.dbdriver.get_follower(agent, chat)
-        if dialog.follower is None:
-            dialog.follower = agent.botovod.dbdriver.add_follower(agent, chat)
+        dialog.__init__(agent, chat, message)
 
         dialog_name = dialog.follower.get_dialog()
         if dialog_name is not None and dialog_name != cls.__name__:
@@ -27,11 +28,37 @@ class Dialog:
         if next_step:
             getattr(dialog, next_step)()
         else:
-            dialog.start()
+            return dialog.start()
 
-    @property
-    def logger(self):
-        raise NotImplementedError
+    def reply(self, text: (str, None)=None, images: Iterator[Image]=[],
+              audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
+              videos: Iterator[Video]=[], locations: Iterator[Location]=[],
+              keyboard: (Keyboard, None)=None, raw: Any=None):
+        self.agent.send_message(self.chat, text=text, images=images, audios=audios,
+                                documents=documents, videos=videos, locations=locations,
+                                keyboard=keyboard, raw=raw)
+
+    async def a_reply(self, text: (str, None)=None, images: Iterator[Image]=[],
+                      audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
+                      videos: Iterator[Video]=[], locations: Iterator[Location]=[],
+                      keyboard: (Keyboard, None)=None, raw: Any=None):
+        await self.agent.a_send_message(self.chat, text=text, images=images, audios=audios,
+                                        documents=documents, videos=videos, locations=locations,
+                                        keyboard=keyboard, raw=raw)
+
+    def set_next_step(self, function: Callable):
+        if hasattr(function, "__self__"):
+            self.follower.set_dialog(function.__self__.__class__.__name__)
+        else:
+            self.follower.set_dialog(function.__qualname__.split(".")[-2])
+        self.follower.set_next_step(function.__name__)
+
+    async def a_set_next_step(self, function: Callable):
+        if hasattr(function, "__self__"):
+            await self.follower.a_set_dialog(function.__self__.__class__.__name__)
+        else:
+            await self.follower.a_set_dialog(function.__qualname__.split(".")[-2])
+        await self.follower.a_set_next_step(function.__name__)
 
     def start(self):
         raise NotImplementedError

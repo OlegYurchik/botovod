@@ -10,7 +10,7 @@ from sqlalchemy import Column, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.types import Boolean, Date, Integer, DateTime, String, Text
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Dict, Iterable
 
 
 Base = declarative_base()
@@ -79,6 +79,16 @@ def delete(one: bool=True):
     return decorator
 
 
+def update():
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            DBDriver.session.commit()
+            return result
+        return wrapper
+    return decorator
+
+
 class Common:
     id = Column(Integer, autoincrement=True, index=True, nullable=False, primary_key=True,
                 unique=True)
@@ -108,12 +118,12 @@ class Follower(dbdrivers.Follower, Common, Base):
         pass
 
     @add()
-    def set_dialog(self, name: str):
+    def set_dialog(self, name: (str, None)=None):
         self.dialog = name
-        self.set_next_step()
+        self.set_next_step("start")
         return self
 
-    async def a_set_dialog(self, name: str):
+    async def a_set_dialog(self, name: (str, None)=None):
         pass
 
     def get_next_step(self) -> str:
@@ -123,11 +133,11 @@ class Follower(dbdrivers.Follower, Common, Base):
         pass
 
     @add()
-    def set_next_step(self, next_step: str="start"):
+    def set_next_step(self, next_step: (str, None)=None):
         self.next_step = next_step
         return self
 
-    async def a_set_next_step(self, next_step: str="start"):
+    async def a_set_next_step(self, next_step: (str, None)=None):
         pass
 
     def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
@@ -191,7 +201,17 @@ class Follower(dbdrivers.Follower, Common, Base):
                               text: (str, None)=None):
         pass
 
-    def get_value(self, name: str):
+    def get_values(self) -> Dict[str, str]:
+        try:
+            return json.loads(self.data)
+        except JSONDecodeError:
+            logging.error("Cannot get values for follower %s %s - incorrect json", self.bot,
+                          self.chat)
+
+    async def a_get_values(self) -> Dict[str, str]:
+        pass
+
+    def get_value(self, name: str) -> str:
         try:
             return json.loads(self.data)[name]
         except KeyError:
@@ -218,9 +238,9 @@ class Follower(dbdrivers.Follower, Common, Base):
     async def a_set_value(self, name: str, value: str):
         pass
 
-    @delete()
+    @update()
     def delete_value(self, name: str):
-        data = json.loads(self.obj.data)
+        data = json.loads(self.data)
         try:
             del data[name]
         except KeyError:
@@ -230,6 +250,13 @@ class Follower(dbdrivers.Follower, Common, Base):
         return self
 
     async def a_delete_value(self, name: str):
+        pass
+
+    @update()
+    def clear_values(self):
+        self.data = "{}"
+
+    async def a_clear_values(self):
         pass
 
 

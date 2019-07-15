@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 import logging
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Dict, Iterator, List, Tuple
 
 
 class Agent:
@@ -74,13 +74,13 @@ class Agent:
     def send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
                      audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
                      videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-                     keyboard: (Keyboard, None)=None, raw: Any=None):
+                     keyboard: (Keyboard, None)=None, raw: (dict, None)=None):
         raise NotImplementedError
 
     async def a_send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
                              audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
                              videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-                             keyboard: (Keyboard, None)=None):
+                             keyboard: (Keyboard, None)=None, raw: (dict, None)=None):
         raise NotImplementedError
 
 
@@ -97,6 +97,7 @@ class Chat(Entity):
 
 class Message(Entity):
     def __init__(self):
+        super().__init__()
         self.text = None
         self.images = []
         self.audios = []
@@ -105,7 +106,6 @@ class Message(Entity):
         self.locations = []
         self.keyboard = None
         self.date = None
-        self.raw = {}
 
 
 class Attachment(Entity):
