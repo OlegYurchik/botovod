@@ -515,7 +515,7 @@ class TelegramAgent(Agent):
     """
 
 
-class TelegramAttachment:
+class TelegramAttachment(Attachment):
     def parser(self, agent: TelegramAgent, data: dict):
         file_path = agent.get_file(data["file_id"])["result"]["file_path"]
         self.url = agent.url.format(token=agent.token, method=file_path)

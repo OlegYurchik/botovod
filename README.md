@@ -15,16 +15,43 @@ User Guide
   * [Installation from Pip][#installation-from-pip]
   * [Installation from GitHub](#installation-from-github)
   * [Quick Start](#quick-start)
+* [User Guide](#user-guide)
+  * [What is Botovod](#what-is-botovod)
+  * [What is Agent](#what-is-agent)
 * [Documentation](#documentation)
   * [botovod](#botovod)
+    * [botovod.AgentDict](#botovod-agentdict)
     * [botovod.Botovod](#botovod-botovod)
-    * [botovod.dialogs](#botovod-dialogs)
-      * [botovod.dialogs.Dialog](#botovod-dialogs-dialog)
     * [botovod.agents](#botovod-agents)
       * [botovod.agents.Agent](#botovod-agents-agent)
       * [botovod.agents.Entity](#botovod-agents-entity)
       * [botovod.agents.Chat](#botovod-agents-chat)
       * [botovod.agents.Message](#botovod-agents-message)
+      * [botovod.agents.Attachment](#botovod-agents-attachment)
+      * [botovod.agents.Image](#botovod-agents-image)
+      * [botovod.agents.Audio](#botovod-agents-audio)
+      * [botovod.agents.Video](#botovod-agents-video)
+      * [botovod.agents.Document](#botovod-agents-document)
+      * [botovod.agents.Location](#botovod-agents-location)
+      * [botovod.agents.Keyboard](#botovod-agents-keyboard)
+      * [botovod.agents.KeyboardButton](#botovod-agents-keyboardbutton)
+      * [botovod.agents.telegram](#botovod-agents-telegram)
+        * [botovod.agents.telegram.TelegramAgent](#botovod-agents-telegram-telegramagent)
+        * [botovod.agents.telegram.TelegramAttachment](#botovod-agents-telegram-telegramattachment)
+        * [botovod.agents.telegram.TelegramMessage](#botovod-agents-telegram-telegrammessage)
+        * [botovod.agents.telegram.TelegramAudio](#botovod-agents-telegram-telegramaudio)
+        * [botovod.agents.telegram.TelegramDocument](#botovod-agents-telegram-telegramdocument)
+        * [botovod.agents.telegram.TelegramPhotoSize](#botovod-agents-telegram-telegramphotosize)
+        * [botovod.agents.telegram.TelegramVideo](#botovod-agents-telegram-telegramvideo)
+        * [botovod.agents.telegram.TelegramLocation](#botovod-agents-telegram-telegramlocation)
+      * [botovod.agents.vk](#botovod-agents-vk)
+    * [botovod.dbdrivers](#botovod-dbdrivers)
+      * [botovod.dbdrivers.Follower](#botovod-dbdrivers-follower)
+      * [botovod.dbdrivers.DBDriver](#botovod-dbdrivers-dbdriver)
+      * [botovod.dbdrivers.django](#botovod-dbdrivers-django)
+      * [botovod.dbdrivers.sqlalchemy](#botovod-dbdrivers-sqlalchemy)
+    * [botovod.dialogs](#botovod-dialogs)
+      * [botovod.dialogs.Dialog](#botovod-dialogs-dialog)
 * [Handlers](#handlers)
 * [Examples](#examples)
 * [Help the author](#help-the-author)
@@ -162,53 +189,6 @@ Method, providing for webservers for listening requests from messengers servers 
 * a_listen(self, name: str, headers: dict, body: string) -> (int, dict, str} or None
 
 Coroutine, providing for webservers for listening requests from messengers servers and handle it.
-### botovod.dialogs
-**module botovod.dialogs**
-### botovod.dialogs.Dialog
-**class botovod.dialogs.Dialog**
-#### Attributes
-* agent: botovod.agents.Agent
-
-Agent which get message
-* chat: botovod.agents.Chat
-
-Chat
-* message: botovod.agents.Message
-
-Message
-* follower: botovod.dbdrivers.Folower
-
-Follower
-#### Methods
-* \_\_init\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
-botovod.agents.Message)
-
-Constructor for creating dialog object
-* \_\_new\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
-botovod.agents.Message)
-
-Method for handling request
-* reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
-audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
-videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
-keyboard: botovod.agents.Keyboard or None=None, raw=None)
-
-Method for replying to message
-* a_reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
-audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
-videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
-keyboard: botovod.agents.Keyboard or None=None, raw=None)
-
-Corotuine for replying to message
-* set_next_step(self, function: Callable)
-
-Method for setting next function for handling message in dialog
-* a_set_next_step(self, function: Callable)
-
-Coroutine for setting next function for handling message in dialog
-* start(self)
-
-Abstract method or coroutine for handling first message from request
 ### botovod.agents
 **package botovod.agents**
 ### botovod.agents.Agent
@@ -301,6 +281,134 @@ Chat constructor
 ### botovod.agents.Message
 **class botovod.agents.Message(botovod.agents.Entity)**
 #### Attributes
+* text: str or None
+
+Message text
+* images: list of botovod.agents.Image
+
+Message images
+* audios: list of botovod.agents.Audio
+
+Message audios
+* videos: list of botovod.agents.Video
+
+Message videos
+* documents: list of botovod.agents.Document
+
+Message documents
+* locations: list of botovod.agents.Location
+
+Message locations
+* date: datetime.datetime
+
+Date and time of message recieved
+#### Methods
+* \_\_init\_\_(self)
+
+Message constructor
+### botovod.agents.Attachment
+**class botovod.agents.Attachment(botovod.agents.Entity)**
+#### Attributes
+* url: str or None
+
+URL for attachment
+* file: str or None
+
+File path in hard disk to attachment
+### botovod.agents.Image
+**class botovod.agents.Image(botovod.agents.Attachment)**
+### botovod.agents.Audio
+**class botovod.agents.Audio(botovod.agents.Attachment)**
+### botovod.agents.Video
+**class botovod.agents.Video(botovod.agents.Attachment)**
+### botovod.agents.Document
+**class botovod.agents.Document(botovod.agents.Attachment)**
+### botovod.agents.Location
+**class botovod.agents.Location(botovod.agents.Entity)**
+#### Attributes
+* latitude: float
+
+Location latitude
+* longitude: float
+
+Location longitude
+#### Methods
+* \_\_init\_\_(self, latitude: float, longitude: float)
+
+Location constructor
+### botovod.agents.Keyboard
+**class botovod.agents.Keyboard(botovod.agents.Entity)**
+#### Attributes
+* buttons: Iterator of botovod.agents.KeyboardButton
+
+buttons for Keyboard
+#### Methods
+* \_\_init\_\_(self, *butons: Iterator of botovod.agents.KeyboardButton)
+
+Keyboard constructor
+### botovod.agents.KeyboardButton
+**class botovod.agents.KeyboardButton**
+#### Attributes
+* text: str
+
+Button text
+#### Methods
+* \_\_init\_\_(self, text: str)
+
+KeyboardButton constructor
+### botovod.dbdrivers
+**package botovod.dbdrivers**
+### botovod.dbdrivers.DBDriver
+**class botovod.dbdrivers.DBDriver**
+### botovod.dbdrivers.Follower
+**class botovod.dbdrivers.Follower**
+### botovod.dialogs
+**module botovod.dialogs**
+### botovod.dialogs.Dialog
+**class botovod.dialogs.Dialog**
+#### Attributes
+* agent: botovod.agents.Agent
+
+Agent which get message
+* chat: botovod.agents.Chat
+
+Chat
+* message: botovod.agents.Message
+
+Message
+* follower: botovod.dbdrivers.Folower
+
+Follower
+#### Methods
+* \_\_init\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
+botovod.agents.Message)
+
+Constructor for creating dialog object
+* \_\_new\_\_(self, agent: botovod.agents.Agent, chat: botovod.agents.Chat, message:
+botovod.agents.Message)
+
+Method for handling request
+* reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
+audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
+videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
+keyboard: botovod.agents.Keyboard or None=None, raw=None)
+
+Method for replying to message
+* a_reply(self, text: str or None=None, images: Iterator of botovod.agents.Image=[],
+audios: Iterator of botovod.agents.Audio=[], documents: Iterator of botovod.agents.Document=[],
+videos: Iterator of botovod.agents.Video=[], locations: Iterator of botovod.agents.Location=[],
+keyboard: botovod.agents.Keyboard or None=None, raw=None)
+
+Corotuine for replying to message
+* set_next_step(self, function: Callable)
+
+Method for setting next function for handling message in dialog
+* a_set_next_step(self, function: Callable)
+
+Coroutine for setting next function for handling message in dialog
+* start(self)
+
+Abstract method or coroutine for handling first message from request
 =================
 # **NOT UPDATED INFORMATION**
 ## Message
@@ -326,9 +434,3 @@ Fields:
 - file_path - File in local disk
 
 Classes Image, Audio, Video and Document is a subclass of Attchment and has no extensions
-
-## Agents
-
-## Telegram
-
-

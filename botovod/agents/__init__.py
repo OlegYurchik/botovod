@@ -104,7 +104,6 @@ class Message(Entity):
         self.videos = []
         self.documents = []
         self.locations = []
-        self.keyboard = None
         self.date = None
 
 
@@ -131,15 +130,18 @@ class Document(Attachment):
 
 class Location(Entity):
     def __init__(self, latitude: float, longitude: float):
+        super().__init__()
         self.latitude = latitude
         self.longitude = longitude
 
 
 class Keyboard(Entity):
-    def __init__(self, *buttons: Tuple[KeyboardButton]):
+    def __init__(self, *buttons: Iterator[KeyboardButton]):
+        super().__init__()
         self.buttons = buttons
 
 
 class KeyboardButton(Entity):
     def __init__(self, text: str):
+        super().__init__()
         self.text = text
