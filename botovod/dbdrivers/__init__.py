@@ -10,28 +10,28 @@ class Follower:
     async def a_get_chat(self) -> Chat:
         raise NotImplementedError
 
-    def get_dialog(self) -> str:
+    def get_dialog(self) -> (str, None):
         raise NotImplementedError
 
-    async def a_get_dialog(self) -> str:
+    async def a_get_dialog(self) -> (str, None):
         raise NotImplementedError
 
-    def set_dialog(self, name: str):
+    def set_dialog(self, name: (str, None)=None):
         raise NotImplementedError
 
-    async def a_set_dialog(self, name: str):
+    async def a_set_dialog(self, name: (str, None)=None):
         raise NotImplementedError
 
-    def get_next_step(self) -> str:
+    def get_next_step(self) -> (str, None):
         raise NotImplementedError
 
-    async def a_get_next_step(self) -> str:
+    async def a_get_next_step(self) -> (str, None):
         raise NotImplementedError
 
-    def set_next_step(self, next_step: str="start"):
+    def set_next_step(self, next_step: (str, None)=None):
         raise NotImplementedError
 
-    async def a_set_next_step(self, next_step: str="start"):
+    async def a_set_next_step(self, next_step: (str, None)=None):
         raise NotImplementedError
 
     def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,

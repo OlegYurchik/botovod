@@ -38,6 +38,42 @@ class Dialog:
                                 documents=documents, videos=videos, locations=locations,
                                 keyboard=keyboard, raw=raw)
 
+    def set_next_step(self, function: Callable):
+        if hasattr(function, "__self__"):
+            self.follower.set_dialog(function.__self__.__class__.__name__)
+        else:
+            self.follower.set_dialog(function.__qualname__.split(".")[-2])
+        self.follower.set_next_step(function.__name__)
+
+    def start(self):
+        raise NotImplementedError
+
+
+class AsyncDialog:
+    async def __init__(self, agent: Agent, chat: Chat, message: Message):
+        self.agent = agent
+        self.chat = chat
+        self.message = message
+        self.follower = await agent.botovod.dbdriver.a_get_follower(agent, chat)
+        if self.follower is None:
+            self.follower = await agent.botovod.dbdriver.a_add_follower(agent, chat)
+
+    async def __new__(cls, agent: Agent, chat: Chat, message: Message):
+        dialog = super().__new__(cls)
+        await dialog.__init__(agent, chat, message)
+
+        dialog_name = await dialog.follower.a_get_dialog()
+        if dialog_name is not None and dialog_name != cls.__name__:
+            raise NotPassed
+        
+        if dialog_name is None:
+            await dialog.follower.a_set_dialog(cls.__name__)
+        next_step = await dialog.follower.a_get_next_step()
+        if next_step:
+            await getattr(dialog, next_step)()
+        else:
+            return await dialog.start()
+
     async def a_reply(self, text: (str, None)=None, images: Iterator[Image]=[],
                       audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
                       videos: Iterator[Video]=[], locations: Iterator[Location]=[],
@@ -45,13 +81,6 @@ class Dialog:
         await self.agent.a_send_message(self.chat, text=text, images=images, audios=audios,
                                         documents=documents, videos=videos, locations=locations,
                                         keyboard=keyboard, raw=raw)
-
-    def set_next_step(self, function: Callable):
-        if hasattr(function, "__self__"):
-            self.follower.set_dialog(function.__self__.__class__.__name__)
-        else:
-            self.follower.set_dialog(function.__qualname__.split(".")[-2])
-        self.follower.set_next_step(function.__name__)
 
     async def a_set_next_step(self, function: Callable):
         if hasattr(function, "__self__"):
@@ -62,7 +91,6 @@ class Dialog:
 
     def start(self):
         raise NotImplementedError
-
 
 # class MessagePaginator(Dialog):
 #     @property

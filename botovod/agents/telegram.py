@@ -145,7 +145,7 @@ class TelegramAgent(Agent):
                 params = {"offset": self.last_update + 1} if self.last_update > 0 else {}
                 async with aiohttp.ClientSession() as session:
                     response = await session.get(url, params=params)
-                updates = await response.json()["result"]
+                updates = (await response.json())["result"]
                 for update in updates:
                     await self.a_listen(dict(response.headers), json.dumps(update))
             except Exception:
@@ -183,7 +183,7 @@ class TelegramAgent(Agent):
                 files["certificate"] = open(self.certificate_path)
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
-        if response.status_code != 200:
+        if response.status != 200:
             self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self, self.name,
                               response.status_code, response.text)
             return
@@ -236,7 +236,7 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url, data=data)
             if response.status != 200:
-                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
+                logging.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
                                   self.name, response.status, await response.text())
         for image in images:
             await self.a_send_photo(chat, image)

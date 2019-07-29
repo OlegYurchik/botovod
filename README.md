@@ -9,10 +9,12 @@ https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QEZ85BDKJCM
 This is a simple and easy-to-use library for interacting with the Instagram. The library works
 through the web interface of the Instagram and does not depend on the official API
 
-User Guide
+Contents
 =================
+* [Release Notes](#release-notes)
+  * [0.1.4](#version-0-1-4)
 * [Getting Started](#getting-started)
-  * [Installation from Pip][#installation-from-pip]
+  * [Installation from Pip](#installation-from-pip)
   * [Installation from GitHub](#installation-from-github)
   * [Quick Start](#quick-start)
 * [User Guide](#user-guide)
@@ -57,6 +59,10 @@ User Guide
 * [Help the author](#help-the-author)
   * [Contribute repo](#contribute-repo)
   * [Donate](#donate)
+## Release Notes
+### Version 0.1.4
+* Add new dbdriver - Gino
+* Fix bugs
 ## Getting Started
 ### Installation from Pip
 For installation botovod library from pip you should have pip with python (prefer python3.6 or

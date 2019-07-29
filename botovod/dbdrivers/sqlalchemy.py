@@ -100,45 +100,30 @@ class Follower(dbdrivers.Follower, Common, Base):
 
     chat = Column(String(64), nullable=False)
     bot = Column(String(64), nullable=False)
-    dialog = Column(String(64))
-    next_step = Column(String(64))
+    dialog = Column(String(64), nullable=True)
+    next_step = Column(String(64), nullable=True)
     data = Column(Text, nullable=False, default="{}")
     messages = relationship("Message", back_populates="follower", uselist=True)
 
     def get_chat(self) -> Chat:
         return Chat(self.bot, self.chat)
 
-    async def a_get_chat(self) -> Chat:
-        pass
-
-    def get_dialog(self) -> str:
+    def get_dialog(self) -> (str, None):
         return self.dialog
-
-    async def a_get_dialog(self) -> str:
-        pass
 
     @add()
     def set_dialog(self, name: (str, None)=None):
         self.dialog = name
-        self.set_next_step("start")
+        self.set_next_step(None if name is None else "start")
         return self
 
-    async def a_set_dialog(self, name: (str, None)=None):
-        pass
-
-    def get_next_step(self) -> str:
+    def get_next_step(self) -> (str, None):
         return self.next_step
-
-    async def a_get_next_step(self) -> str:
-        pass
 
     @add()
     def set_next_step(self, next_step: (str, None)=None):
         self.next_step = next_step
         return self
-
-    async def a_set_next_step(self, next_step: (str, None)=None):
-        pass
 
     def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
                     input: (bool, None)=None, text: (str, None)=None) -> Iterable[BotoMessage]:
@@ -152,11 +137,6 @@ class Follower(dbdrivers.Follower, Common, Base):
         if text is not None:
             messages = messages.filter(Message.text.like(text))
         return [message.to_object() for message in messages.all()]
-
-    async def a_get_history(self, after_date: (datetime, None)=None,
-                            before_date: (datetime, None)=None, input: (bool, None)=None,
-                            text: (str, None)=None) -> Iterable[BotoMessage]:
-        pass
 
     @add()
     def add_history(self, date: datetime, text: (str, None)=None, images: Iterable[Image]=[],
@@ -176,12 +156,6 @@ class Follower(dbdrivers.Follower, Common, Base):
             date = date,
         )
 
-    async def a_add_history(self, date: datetime, text: (str, None)=None,
-                            images: Iterable[Image]=[], audios: Iterable[Audio]=[],
-                            videos: Iterable[Video]=[], documents: Iterable[Document]=[],
-                            locations: Iterable[Location]=[], raw: Any=None, input: bool=True):
-        pass
-
     @delete(one=False)
     def clear_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
                       input: (datetime, None)=None, text: (str, None)=None):
@@ -196,20 +170,12 @@ class Follower(dbdrivers.Follower, Common, Base):
             messages = messages.filter(Message.text.like(text))
         return messages
 
-    async def a_clear_history(self, after_date: (datetime, None)=None,
-                              before_date: (datetime, None)=None, input: (datetime, None)=None,
-                              text: (str, None)=None):
-        pass
-
     def get_values(self) -> Dict[str, str]:
         try:
             return json.loads(self.data)
         except JSONDecodeError:
             logging.error("Cannot get values for follower %s %s - incorrect json", self.bot,
                           self.chat)
-
-    async def a_get_values(self) -> Dict[str, str]:
-        pass
 
     def get_value(self, name: str) -> str:
         try:
@@ -220,9 +186,6 @@ class Follower(dbdrivers.Follower, Common, Base):
         except JSONDecodeError:
             logging.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
                           self.bot, self.chat)
-
-    async def a_get_value(self, name: str):
-        pass
 
     @add()
     def set_value(self, name: str, value: str):
@@ -235,9 +198,6 @@ class Follower(dbdrivers.Follower, Common, Base):
         self.data = json.dumps(data)
         return self
 
-    async def a_set_value(self, name: str, value: str):
-        pass
-
     @update()
     def delete_value(self, name: str):
         data = json.loads(self.data)
@@ -249,15 +209,9 @@ class Follower(dbdrivers.Follower, Common, Base):
         self.data = json.dumps(data)
         return self
 
-    async def a_delete_value(self, name: str):
-        pass
-
     @update()
     def clear_values(self):
         self.data = "{}"
-
-    async def a_clear_values(self):
-        pass
 
 
 class Message(Common, Base):
@@ -289,15 +243,15 @@ class Message(Common, Base):
 
 class DBDriver(dbdrivers.DBDriver):
     @classmethod
-    def connect(cls, type: str, database: str, host: (str, int, None)=None,
+    def connect(cls, engine: str, database: str, host: (str, int, None)=None,
                 username: (str, None)=None, password: (str, None)=None, debug: bool=False):
-        string = f"{type}://"
+        dsn = f"{engine}://"
         if username is not None and password is not None:
-            string = string + f"{username}:{password}@"
+            dsn += f"{username}:{password}@"
         if host is not None:
-            string = string + f"{host}/"
-        string = string + database
-        cls.engine = create_engine(string, echo=debug)
+            dsn += f"{host}/"
+        dsn += database
+        cls.engine = create_engine(dsn, echo=debug)
         cls.metadata = Base.metadata
         cls.metadata.create_all(cls.engine)
         Session = sessionmaker()
@@ -305,18 +259,9 @@ class DBDriver(dbdrivers.DBDriver):
         cls.session = Session()
 
     @classmethod
-    async def a_connect(cls, type: str, database: str, host: (str, int, None)=None,
-                        username: (str, None)=None, password: (str, None)=None, debug: bool=False):
-        pass
-
-    @classmethod
     def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
         follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
         return follower.filter(Follower.chat == chat.id).first()
-
-    @classmethod
-    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Follower:
-        pass
 
     @classmethod
     @add()
@@ -325,16 +270,8 @@ class DBDriver(dbdrivers.DBDriver):
         return follower
 
     @classmethod
-    async def a_add_follower(cls, agent: Agent, chat: Chat) -> Follower:
-        pass
-
-    @classmethod
     @delete()
     def delete_follower(cls, agent: Agent, chat: Chat):
         follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
         follower = follower.filter(Follower.chat == chat.id)
         return follower
-
-    @classmethod
-    async def a_delete_follower(cls, agent: Agent, chat: Chat):
-        pass
