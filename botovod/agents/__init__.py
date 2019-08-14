@@ -1,11 +1,13 @@
 from __future__ import annotations
 import asyncio
+from datetime import datetime
 import logging
 from typing import Dict, Iterator, List, Tuple
 
 
 class Agent:
-    def __init__(self, logger: logging.Logger=logging.getLogger(__name__)):
+    def __init__(self, message_storage: object=None,
+                 logger: logging.Logger=logging.getLogger(__name__)):
         self.logger = logger
         self.botovod = None
         self.name = None
@@ -71,77 +73,61 @@ class Agent:
                           body: str) -> Tuple[int, Dict[str, str], str]:
         raise NotImplementedError
 
-    def send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
-                     audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
-                     videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-                     keyboard: (Keyboard, None)=None, raw: (dict, None)=None):
+    def send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Attachment]=[],
+                     audios: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
+                     videos: Iterator[Attachment]=[], locations: Iterator[Attachment]=[],
+                     keyboard: (Keyboard, None)=None, **raw):
         raise NotImplementedError
 
-    async def a_send_message(self, chat: Chat, text: (str, None)=None, images: Iterator[Image]=[],
-                             audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
-                             videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-                             keyboard: (Keyboard, None)=None, raw: (dict, None)=None):
+    async def a_send_message(self, chat: Chat, text: (str, None)=None,
+                             images: Iterator[Attachment]=[], audios: Iterator[Attachment]=[],
+                             documents: Iterator[Attachment]=[], videos: Iterator[Attachment]=[],
+                             locations: Iterator[Location]=[], keyboard: (Keyboard, None)=None,
+                             **raw):
         raise NotImplementedError
 
 
-class Entity:
-    def __init__(self):
-        self.raw = {}
-
-
-class Chat(Entity):
-    def __init__(self, agent: Agent, id: str):
+class Chat:
+    def __init__(self, agent: Agent, id: str, **raw):
         self.agent = agent
         self.id = id
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
 
-class Message(Entity):
-    def __init__(self):
-        super().__init__()
-        self.text = None
-        self.images = []
-        self.audios = []
-        self.videos = []
-        self.documents = []
-        self.locations = []
-        self.date = None
+class Message:
+    def __init__(self, text: (str, None)=None, images: Iterator[Attachment]=[],
+                 audios: Iterator[Attachment]=[], videos: Iterator[Attachment]=[],
+                 documents: Iterator[Attachment]=[], locations: Iterator[Location]=[], **raw):
+        self.text = text
+        self.images = images
+        self.audios = audios
+        self.videos = videos
+        self.documents = documents
+        self.locations = locations
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
 
-class Attachment(Entity):
-    url = None
-    file = None
+class Attachment:
+    def __init__(self, url: (str, None)=None, filepath: (str, None)=None, **raw):
+        self.url = url
+        self.filepath = filepath
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
 
-class Image(Attachment):
-    pass
-
-
-class Audio(Attachment):
-    pass
-
-
-class Video(Attachment):
-    pass
-
-
-class Document(Attachment):
-    pass
-
-
-class Location(Entity):
-    def __init__(self, latitude: float, longitude: float):
-        super().__init__()
+class Location:
+    def __init__(self, latitude: float, longitude: float, **raw):
         self.latitude = latitude
         self.longitude = longitude
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
 
-class Keyboard(Entity):
-    def __init__(self, *buttons: Iterator[KeyboardButton]):
-        super().__init__()
+class Keyboard:
+    def __init__(self, buttons: Iterator[Iterator[KeyboardButton]], **raw):
         self.buttons = buttons
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
 
-class KeyboardButton(Entity):
-    def __init__(self, text: str):
-        super().__init__()
+class KeyboardButton:
+    def __init__(self, text: str, **raw):
         self.text = text
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from botovod import dbdrivers
-from botovod.agents import (Agent, Attachment, Audio, Chat, Document, Image, Location,
-                            Message as BotoMessage, Video)
+from botovod.agents import Agent, Attachment, Chat, Location, Message as BotoMessage
 from datetime import datetime
 import json
 from json import JSONDecodeError
@@ -14,39 +13,6 @@ from typing import Any, Callable, Dict, Iterable
 
 
 Base = declarative_base()
-
-
-def attachment_render(attachment: Attachment) -> dict:
-    return {
-        "url": attachment.url,
-        "file": attachment.file,
-        "raw": attachment.raw,
-    }
-
-
-def attachment_parser(data: dict) -> Attachment:
-    attachment = Attachment
-    attachment.url = data["url"]
-    attachment.file = data["file"]
-    attachment.raw = data["raw"]
-    return attachment
-
-
-def location_render(location: Location) -> dict:
-    return {
-        "longitude": location.longitude,
-        "latitude": location.latitude,
-        "raw": location.raw,
-    }
-
-
-def location_parser(data: dict) -> Location:
-    location = Location(
-        longitude = data["longitude"],
-        latitude = data["latitude"],
-    )
-    location.raw = data["raw"]
-    return location
 
 
 def add(one: bool=True):
@@ -125,13 +91,13 @@ class Follower(dbdrivers.Follower, Common, Base):
         self.next_step = next_step
         return self
 
-    def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
+    def get_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
                     input: (bool, None)=None, text: (str, None)=None) -> Iterable[BotoMessage]:
         messages = self.messages
-        if after_date is not None:
-            messages = messages.filter(Message.date >= after_date)
-        if before_date is not None:
-            messages = messages.filter(Message.date <= before_date)
+        if after is not None:
+            messages = messages.filter(Message.datetime >= after)
+        if before is not None:
+            messages = messages.filter(Message.datetime <= before)
         if input is not None:
             messages = messages.filter(Message.input == input)
         if text is not None:
@@ -139,31 +105,31 @@ class Follower(dbdrivers.Follower, Common, Base):
         return [message.to_object() for message in messages.all()]
 
     @add()
-    def add_history(self, date: datetime, text: (str, None)=None, images: Iterable[Image]=[],
-                    audios: Iterable[Audio]=[], videos: Iterable[Video]=[],
-                    documents: Iterable[Document]=[], locations: Iterable[Location]=[],
-                    raw: Any=None, input: bool=True):
+    def add_history(self, datetime: datetime, text: (str, None)=None,
+                    images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
+                    videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
+                    locations: Iterable[Location]=[], input: bool=True, **raw):
         return Message(
-            follower_id = self.id,
-            input = input,
-            text = text,
-            images = json.loads([attachment_render(image) for image in images]),
-            audios = json.loads([attachment_render(audio) for audio in audios]),
-            videos = json.loads([attachment_render(video) for video in videos]),
-            documents = json.loads([attachment_render(document) for document in documents]),
-            locations = json.loads([location_render(location) for location in locations]),
-            raw = json.loads(raw),
-            date = date,
+            follower_id=self.id,
+            input=input,
+            text=text,
+            images=json.loads([image.__dict__ for image in images]),
+            audios=json.loads([audio.__dict__ for audio in audios]),
+            videos=json.loads([video.__dict__ for video in videos]),
+            documents=json.loads([document.__dict__ for document in documents]),
+            locations=json.loads([location.__dict__ for location in locations]),
+            raw=json.loads(raw),
+            datetime=datetime,
         )
 
     @delete(one=False)
-    def clear_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
-                      input: (datetime, None)=None, text: (str, None)=None):
+    def clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
+                      input: (bool, None)=None, text: (str, None)=None):
         messages = self.messages
-        if not after_date is None:
-            messages = messages.filter(Message.date >= after_date)
-        if not before_date is None:
-            messages = messages.filter(Message.date <= before_date)
+        if not after is None:
+            messages = messages.filter(Message.datetime >= after)
+        if not before is None:
+            messages = messages.filter(Message.datetime <= before)
         if not input is None:
             messages = messages.filter(Message.input == input)
         if not text is None:
@@ -227,16 +193,27 @@ class Message(Common, Base):
     documents = Column(Text, nullable=False, default="[]")
     locations = Column(Text, nullable=False, default="[]")
     raw = Column(Text)
-    date = Column(Date, nullable=False)
+    datetime = Column(Date, nullable=False)
+
+    @staticmethod
+    def parser(cls, data: dict):
+        obj = cls()
+        for key, value in data.items():
+            obj.__setattr__(key, value)
+        return obj
 
     def to_object(self):
         message = BotoMessage()
         message.text = self.text
-        message.images = [attachment_parser(image) for image in json.loads(self.images)]
-        message.audios = [attachment_parser(audio) for audio in json.loads(self.audios)]
-        message.videos = [attachment_parser(video) for video in json.loads(self.videos)]
-        message.documents = [attachment_parser(document) for document in json.loads(self.documents)]
-        message.locations = [location_parser(location) for location in json.loads(self.locations)]
+        message.images = [self.parser(Attachment, image) for image in json.loads(self.images)]
+        message.audios = [self.parser(Attachment, audio) for audio in json.loads(self.audios)]
+        message.videos = [self.parser(Attachment, video) for video in json.loads(self.videos)]
+        message.documents = [
+            self.parser(Attachment, document) for document in json.loads(self.documents)
+        ]
+        message.locations = [
+            self.parser(Location, location) for location in json.loads(self.locations)
+        ]
         message.raw = json.loads(self.raw)
         return message
 

@@ -1,4 +1,4 @@
-from botovod.agents import Agent, Audio, Chat, Document, Image, Location, Video
+from botovod.agents import Agent, Attachment, Chat, Location
 from datetime import datetime
 from typing import Any, Dict, Iterable
 
@@ -34,34 +34,32 @@ class Follower:
     async def a_set_next_step(self, next_step: (str, None)=None):
         raise NotImplementedError
 
-    def get_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
+    def get_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
                     input: (bool, None)=None, text: (str, None)=None):
         raise NotImplementedError
 
-    async def a_get_history(self, after_date: (datetime, None)=None,
-                            before_date: (datetime, None)=None, input: (bool, None)=None,
-                            text: (str, None)=None):
+    async def a_get_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
+                            input: (bool, None)=None, text: (str, None)=None):
         raise NotImplementedError
 
-    def add_history(self, date: datetime, text: (str, None)=None, images: Iterable[Image]=[],
-                    audios: Iterable[Audio]=[], videos: Iterable[Video]=[],
-                    documents: Iterable[Document]=[], locations: Iterable[Location]=[],
-                    raw: Any=None, input: bool=True):
+    def add_history(self, datetime: datetime, text: (str, None)=None,
+                    images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
+                    videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
+                    locations: Iterable[Location]=[], input: bool=True, **raw):
         raise NotImplementedError
 
-    async def a_add_history(self, date: datetime, text: (str, None)=None,
-                            images: Iterable[Image]=[], audios: Iterable[Audio]=[],
-                            videos: Iterable[Video]=[], documents: Iterable[Document]=[],
-                            locations: Iterable[Location]=[], raw: Any=None, input: bool=True):
+    async def a_add_history(self, datetime: datetime, text: (str, None)=None,
+                            images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
+                            videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
+                            locations: Iterable[Location]=[], input: bool=True, **raw):
         raise NotImplementedError
 
-    def clear_history(self, after_date: (datetime, None)=None, before_date: (datetime, None)=None,
+    def clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
                       input: (bool, None)=None, text: (str, None)=None):
         raise NotImplementedError
 
-    async def a_clear_history(self, after_date: (datetime, None)=None,
-                              before_date: (datetime, None)=None, input: (bool, None)=None,
-                              text: (str, None)=None):
+    async def a_clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
+                              input: (bool, None)=None, text: (str, None)=None):
         raise NotImplementedError
 
     def get_values(self) -> Dict[str, str]:

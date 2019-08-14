@@ -1,5 +1,5 @@
 import json
-from botovod.agents import Agent, Audio, Chat, Document, Keyboard, Location, Image, Message, Video
+from botovod.agents import Agent, Attachment, Chat, Keyboard, Location, Message
 from botovod.utils.exceptions import NotPassed
 import logging
 from typing import Any, Callable, Iterator
@@ -30,13 +30,13 @@ class Dialog:
         else:
             return dialog.start()
 
-    def reply(self, text: (str, None)=None, images: Iterator[Image]=[],
-              audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
-              videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-              keyboard: (Keyboard, None)=None, raw: Any=None):
+    def reply(self, text: (str, None)=None, images: Iterator[Attachment]=[],
+              audios: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
+              videos: Iterator[Attachment]=[], locations: Iterator[Location]=[],
+              keyboard: (Keyboard, None)=None, **raw):
         self.agent.send_message(self.chat, text=text, images=images, audios=audios,
                                 documents=documents, videos=videos, locations=locations,
-                                keyboard=keyboard, raw=raw)
+                                keyboard=keyboard, **raw)
 
     def set_next_step(self, function: Callable):
         if hasattr(function, "__self__"):
@@ -74,13 +74,13 @@ class AsyncDialog:
         else:
             return await dialog.start()
 
-    async def a_reply(self, text: (str, None)=None, images: Iterator[Image]=[],
-                      audios: Iterator[Audio]=[], documents: Iterator[Document]=[],
-                      videos: Iterator[Video]=[], locations: Iterator[Location]=[],
-                      keyboard: (Keyboard, None)=None, raw: Any=None):
+    async def a_reply(self, text: (str, None)=None, images: Iterator[Attachment]=[],
+                      audios: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
+                      videos: Iterator[Attachment]=[], locations: Iterator[Location]=[],
+                      keyboard: (Keyboard, None)=None, **raw):
         await self.agent.a_send_message(self.chat, text=text, images=images, audios=audios,
                                         documents=documents, videos=videos, locations=locations,
-                                        keyboard=keyboard, raw=raw)
+                                        keyboard=keyboard, **raw)
 
     async def a_set_next_step(self, function: Callable):
         if hasattr(function, "__self__"):

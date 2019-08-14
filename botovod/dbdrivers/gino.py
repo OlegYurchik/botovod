@@ -1,6 +1,5 @@
 from botovod import dbdrivers
-from botovod.agents import (Agent, Attachment, Audio, Chat, Document, Image, Location,
-                            Message as BotoMessage, Video)
+from botovod.agents import Agent, Attachment, Chat, Location, Message as BotoMessage
 from datetime import datetime
 import gino
 import json
@@ -10,39 +9,6 @@ from typing import Dict, Iterable
 
 
 db = gino.Gino()
-
-
-def attachment_render(attachment: Attachment) -> dict:
-    return {
-        "url": attachment.url,
-        "file": attachment.file,
-        "raw": attachment.raw,
-    }
-
-
-def attachment_parser(data: dict) -> Attachment:
-    attachment = Attachment
-    attachment.url = data["url"]
-    attachment.file = data["file"]
-    attachment.raw = data["raw"]
-    return attachment
-
-
-def location_render(location: Location) -> dict:
-    return {
-        "longitude": location.longitude,
-        "latitude": location.latitude,
-        "raw": location.raw,
-    }
-
-
-def location_parser(data: dict) -> Location:
-    location = Location(
-        longitude = data["longitude"],
-        latitude = data["latitude"],
-    )
-    location.raw = data["raw"]
-    return location
 
 
 class Common:
@@ -90,31 +56,30 @@ class Follower(Common, db.Model):
             condition = condition and Message.text.like(text)
         return [message.to_object() for message in await Message.query.where(condition).gino.all()]
 
-    async def a_add_history(self, date: datetime, text: (str, None)=None,
-                            images: Iterable[Image]=[], audios: Iterable[Audio]=[],
-                            videos: Iterable[Video]=[], documents: Iterable[Document]=[],
+    async def a_add_history(self, datetime: datetime, text: (str, None)=None,
+                            images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
+                            videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
                             locations: Iterable[Location]=[], raw: dict={}, input: bool=True):
         await Message.create(
-            follower_id = self.id,
-            input = input,
-            text = text,
-            images = json.loads([attachment_render(image) for image in images]),
-            audios = json.loads([attachment_render(audio) for audio in audios]),
-            videos = json.loads([attachment_render(video) for video in videos]),
-            documents = json.loads([attachment_render(document) for document in documents]),
-            locations = json.loads([location_render(location) for location in locations]),
-            raw = json.loads(raw),
-            date = date,
+            follower_id=self.id,
+            input=input,
+            text=text,
+            images=json.loads([image.__dict__ for image in images]),
+            audios=json.loads([audio.__dict__ for audio in audios]),
+            videos=json.loads([video.__dict__ for video in videos]),
+            documents=json.loads([document.__dict__ for document in documents]),
+            locations=json.loads([location.__dict__ for location in locations]),
+            raw=json.loads(raw),
+            datetime=datetime,
         )
 
-    async def a_clear_history(self, after_date: (datetime, None)=None,
-                              before_date: (datetime, None)=None, input: (datetime, None)=None,
-                              text: (str, None)=None):
+    async def a_clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
+                              input: (datetime, None)=None, text: (str, None)=None):
         condition = Message.follower_id == self.id
-        if not after_date is None:
-            condition = condition and Message.date >= after_date
-        if not before_date is None:
-            condition = condition and Message.date <= before_date
+        if not after is None:
+            condition = condition and Message.datetime >= after
+        if not before is None:
+            condition = condition and Message.datetime <= before
         if not input is None:
             condition = condition and Message.input == input
         if not text is None:
@@ -175,15 +140,25 @@ class Message(Common, db.Model):
     raw = db.Column(db.Text)
     datetime = db.Column(db.DateTime, nullable=False)
 
+    @staticmethod
+    def parser(cls, data: dict):
+        obj = cls()
+        for key, value in data.items():
+            obj.__setattr__(key, value)
+        return obj
+
     def to_object(self):
         message = BotoMessage()
         message.text = self.text
-        message.images = [attachment_parser(image) for image in json.loads(self.images)]
-        message.audios = [attachment_parser(audio) for audio in json.loads(self.audios)]
-        message.videos = [attachment_parser(video) for video in json.loads(self.videos)]
-        message.documents = [attachment_parser(document) for document in json.loads(self.documents)]
-        message.locations = [location_parser(location) for location in json.loads(self.locations)]
-        message.raw = json.loads(self.raw)
+        message.images = [self.parser(Attachment, image) for image in json.loads(self.images)]
+        message.audios = [self.parser(Attachment, audio) for audio in json.loads(self.audios)]
+        message.videos = [self.parser(Attachment, video) for video in json.loads(self.videos)]
+        message.documents = [
+            self.parser(Attachment, document) for document in json.loads(self.documents)
+        ]
+        message.locations = [
+            self.parser(Location, location) for location in json.loads(self.locations)
+        ]
         return message
 
 
