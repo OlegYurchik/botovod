@@ -17,7 +17,7 @@ class Common:
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
 
-class Follower(Common, db.Model):
+class Follower(dbdrivers.Follower, Common, db.Model):
     __tablename__ = "botovod_followers"
 
     chat = db.Column(db.Unicode(length=64), nullable=False)

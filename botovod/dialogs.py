@@ -1,5 +1,6 @@
 import json
 from botovod.agents import Agent, Attachment, Chat, Keyboard, Location, Message
+from botovod.agents.telegram import TelegramAgent, TelegramCallback
 from botovod.utils.exceptions import NotPassed
 import logging
 from typing import Any, Callable, Iterator
@@ -45,6 +46,10 @@ class Dialog:
             self.follower.set_dialog(function.__qualname__.split(".")[-2])
         self.follower.set_next_step(function.__name__)
 
+    def start_dialog(self, dialog_class: Callable):
+        self.follower.set_dialog(dialog_class.__name__)
+        dialog_class(self.agent, self.chat, self.message)
+
     def start(self):
         raise NotImplementedError
 
@@ -74,23 +79,28 @@ class AsyncDialog:
         else:
             return await dialog.start()
 
-    async def a_reply(self, text: (str, None)=None, images: Iterator[Attachment]=[],
-                      audios: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
-                      videos: Iterator[Attachment]=[], locations: Iterator[Location]=[],
-                      keyboard: (Keyboard, None)=None, **raw):
-        await self.agent.a_send_message(self.chat, text=text, images=images, audios=audios,
-                                        documents=documents, videos=videos, locations=locations,
-                                        keyboard=keyboard, **raw)
+    async def reply(self, text: (str, None)=None, images: Iterator[Attachment]=[],
+                    audios: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
+                    videos: Iterator[Attachment]=[], locations: Iterator[Location]=[],
+                    keyboard: (Keyboard, None)=None, **raw):
+        return await self.agent.a_send_message(chat=self.chat, text=text, images=images,
+                                               audios=audios, documents=documents, videos=videos,
+                                               locations=locations, keyboard=keyboard, **raw)
 
-    async def a_set_next_step(self, function: Callable):
+    async def set_next_step(self, function: Callable):
         if hasattr(function, "__self__"):
             await self.follower.a_set_dialog(function.__self__.__class__.__name__)
         else:
             await self.follower.a_set_dialog(function.__qualname__.split(".")[-2])
         await self.follower.a_set_next_step(function.__name__)
 
-    def start(self):
+    async def start_dialog(self, dialog_class: Callable):
+        await self.follower.a_set_dialog(dialog_class.__name__)
+        await dialog_class(self.agent, self.chat, self.message)
+
+    async def start(self):
         raise NotImplementedError
+
 
 # class MessagePaginator(Dialog):
 #     @property

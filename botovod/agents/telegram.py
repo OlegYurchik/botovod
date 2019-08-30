@@ -88,15 +88,15 @@ class TelegramAgent(Agent):
         self.last_update = update["update_id"]
         if "message" in update:
             chat = TelegramChat.parse(agent=self, data=update["message"]["chat"])
-            message = TelegramMessage.parse(agent=self, data=update["message"])
+            message = TelegramMessage.parse(data=update["message"], agent=self)
             messages.append((chat, message))
         if "callback_query" in update:
-            data = update["callback_data"]
+            data = update["callback_query"]
             if "message" in data:
                 chat = TelegramChat.parse(agent=self, data=data["message"]["chat"])
             else:
                 chat = TelegramUser.parse(agent=self, data=data["from"])
-            message = TelegramCallback.parse(data=update["callback_data"])
+            message = TelegramCallback.parse(data=update["callback_query"])
             messages.append((chat, message))
         return messages
 
@@ -109,15 +109,15 @@ class TelegramAgent(Agent):
         self.last_update = update["update_id"]
         if "message" in update:
             chat = TelegramChat.parse(agent=self, data=update["message"]["chat"])
-            message = await TelegramMessage.a_parse(agent=self, data=update["message"])
+            message = await TelegramMessage.a_parse(data=update["message"], agent=self)
             messages.append((chat, message))
         if "callback_query" in update:
-            data = update["callback_data"]
+            data = update["callback_query"]
             if "message" in data:
                 chat = TelegramChat.parse(agent=self, data=data["message"]["chat"])
             else:
                 chat = TelegramUser.parse(agent=self, data=data["from"])
-            message = TelegramCallback.parse(data=update["callback_data"])
+            message = TelegramCallback.parse(data=update["callback_query"])
             messages.append((chat, message))
         return messages
 
@@ -161,11 +161,12 @@ class TelegramAgent(Agent):
             finally:
                 await asyncio.sleep(self.delay)
 
-    def send_attachment(self, type: str, chat: Chat, attachment: Attachment, **raw):
+    def send_attachment(self, type: str, chat: Chat, attachment: Attachment,
+                        keyboard: (Keyboard, None)=None):
         url = self.url.format(token=self.token, method="send" + type.capitalize())
         data = {"chat_id": chat.id}
         if "id" in attachment.raw:
-            data["file_id"] = attachment.raw["id"]
+            data[type] = attachment.raw["id"]
         elif attachment.url is not None:
             data[type] = attachment.url
             response = requests.post(url, data=data)
@@ -173,17 +174,24 @@ class TelegramAgent(Agent):
             data[type] = open(attachment.filepath)
         else:
             return
-        data.update(raw)
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
         response = requests.post(url, data=data)
         if response.status_code != 200:
             self.logger.error("[%s:%s] Cannot send photo! Code: %s; Body: %s", self, self.name,
                               response.status_code, response.text)
+        else:
+            return TelegramMessage.parse(response.json()["result"])
 
-    async def a_send_attachment(self, type: str, chat: Chat, attachment: Attachment, **raw):
+    async def a_send_attachment(self, type: str, chat: Chat, attachment: Attachment,
+                                keyboard: (Keyboard, None)=None):
         url = self.url.format(token=self.token, method="send" + type.capitalize())
         data = {"chat_id": chat.id}
         if "id" in attachment.raw:
-            data["file_id"] = attachment.raw["id"]
+            data[type] = attachment.raw["id"]
         elif attachment.url is not None:
             data[type] = attachment.url
             response = requests.post(url, data=data)
@@ -191,12 +199,18 @@ class TelegramAgent(Agent):
             data[type] = open(attachment.filepath)
         else:
             return
-        data.update(raw)
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
         async with aiohttp.ClientSession() as session:
             response = await session.post( url, data=data)
         if response.status != 200:
             self.logger.error("[%s:%s] Cannot send photo! Code: %s; Body: %s", self, self.name,
                               response.status, await response.text())
+        else:
+            return await TelegramMessage.a_parse((await response.json())["result"])
 
     def set_webhook(self):
         self.logger.info("[%s:%s] Setting webhook...", self, self.name)
@@ -253,6 +267,7 @@ class TelegramAgent(Agent):
                      keyboard: (Keyboard, None)=None, mode: (str, None)=None,
                      web_preview: bool=True, notification: bool=True,
                      reply: (Message, None)=None):
+        messages = []
         if text is not None:
             url = self.url.format(token=self.token, method="sendMessage")
             data = {
@@ -274,16 +289,29 @@ class TelegramAgent(Agent):
             if response.status_code != 200:
                 self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
                                   self.name, response.status_code, response.text)
+            else:
+                messages.append(TelegramMessage.parse(response.json()["result"]))
         for image in images:
-            self.send_photo(chat, image)
+            message = self.send_photo(chat, image, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for audio in audios:
-            self.send_audio(chat, audio)
+            message = self.send_audio(chat, audio, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for document in documents:
-            self.send_document(chat, document)
+            message = self.send_document(chat, document, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for video in videos:
-            self.send_video(chat, video)
+            message = self.send_video(chat, video, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for location in locations:
-            self.send_location(chat, location)
+            message = self.send_location(chat, location, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
+        return messages
 
     async def a_send_message(self, chat: Chat, text: (str, None)=None,
                              images: Iterator[Attachment]=[], audios: Iterator[Attachment]=[],
@@ -291,6 +319,7 @@ class TelegramAgent(Agent):
                              locations: Iterator[Location]=[], keyboard: (Keyboard, None)=None,
                              mode: (str, None)=None, web_preview: bool=True,
                              notification: bool=True, reply: (Message, None)=None):
+        messages = []
         if text is not None:
             url = self.url.format(token=self.token, method="sendMessage")
             data = {
@@ -311,60 +340,93 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url, data=data)
             if response.status != 200:
-                logging.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
+                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
                                   self.name, response.status, await response.text())
+            else:
+                messages.append(TelegramMessage.parse((await response.json())["result"]))
         for image in images:
-            await self.a_send_photo(chat, image)
+            message = await self.a_send_photo(chat, image, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for audio in  audios:
-            await self.a_send_audio(chat, audio)
+            message = await self.a_send_audio(chat, audio, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for document in documents:
-            await self.a_send_document(chat, document)
+            message = await self.a_send_document(chat, document, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for video in videos:
-            await self.a_send_video(chat, video)
+            message = await self.a_send_video(chat, video, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
         for location in locations:
-            await self.a_send_location(chat, location)
+            message = await self.a_send_location(chat, location, keyboard=keyboard)
+            if message is not None:
+                messages.append(message)
+        return messages
 
-    def send_photo(self, chat: Chat, image: Attachment):
-        return self.send_attachment(agent=self, type="photo", chat=chat, attachment=image)
+    def send_photo(self, chat: Chat, image: Attachment, keyboard: (Keyboard, None)=None):
+        return self.send_attachment(type="photo", chat=chat, attachment=image, keyboard=keyboard)
 
-    async def a_send_photo(self, chat: Chat, image: Attachment):
-        return await self.a_send_attachment(agent=self, type="photo", chat=chat, attachment=image)
+    async def a_send_photo(self, chat: Chat, image: Attachment, keyboard: (Keyboard, None)=None):
+        return await self.a_send_attachment(type="photo", chat=chat, attachment=image,
+                                            keyboard=keyboard)
 
-    def send_audio(self, chat: Chat, audio: Attachment):
-        return self.send_attachment(agent=self, type="audio", chat=chat, attachment=audio)
+    def send_audio(self, chat: Chat, audio: Attachment, keyboard: (Keyboard, None)=None):
+        return self.send_attachment(type="audio", chat=chat, attachment=audio, keyboard=keyboard)
 
-    async def a_send_audio(self, chat: Chat, audio: Attachment):
-        return await self.a_send_attachment(agent=self, type="audio", chat=chat, attachment=audio)
+    async def a_send_audio(self, chat: Chat, audio: Attachment, keyboard: (Keyboard, None)=None):
+        return await self.a_send_attachment(type="audio", chat=chat, attachment=audio,
+                                            keyboard=keyboard)
 
-    def send_document(self, chat: Chat, document: Attachment):
-        return self.send_attachment(agent=self, type="document", chat=chat, attachment=document)
+    def send_document(self, chat: Chat, document: Attachment, keyboard: (Keyboard, None)=None):
+        return self.send_attachment(type="document", chat=chat, attachment=document,
+                                    keyboard=keyboard)
 
-    async def a_send_document(self, chat: Chat, document: Attachment):
-        return await self.a_send_attachment(agent=self, type="document", chat=chat,
-                                            attachment=document)
+    async def a_send_document(self, chat: Chat, document: Attachment,
+                              keyboard: (Keyboard, None)=None):
+        return await self.a_send_attachment(type="document", chat=chat, attachment=document,
+                                            keyboard=keyboard)
 
-    def send_video(self, chat: Chat, video: Attachment):
-        return self.send_attachment(agent=self, type="video", chat=chat, attachment=video)
+    def send_video(self, chat: Chat, video: Attachment, keyboard: (Keyboard, None)=None):
+        return self.send_attachment(type="video", chat=chat, attachment=video, keyboard=keyboard)
 
-    async def a_send_video(self, chat: Chat, video: Attachment):
-        return await self.a_send_attachment(agent=self, type="video", chat=chat, attachment=video)
+    async def a_send_video(self, chat: Chat, video: Attachment, keyboard: (Keyboard, None)=None):
+        return await self.a_send_attachment(type="video", chat=chat, attachment=video,
+                                            keyboard=keyboard)
 
-    def send_location(self, chat: Chat, location: Location):
+    def send_location(self, chat: Chat, location: Location, keyboard: (Keyboard, None)=None):
         url = self.url.format(token=self.token, method="sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
         response = requests.post(url, data=data)
         if response.status_code != 200:
             self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
                               response.status_code, response.text)
+        else:
+            return TelegramMessage.parse(response.json())
 
-    async def a_send_location(self, chat: Chat, location: Location):
+    async def a_send_location(self, chat: Chat, location: Location,
+                              keyboard: (Keyboard, None)=None):
         url = self.url.format(token=self.token, method="sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
             self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
                               response.status, await response.text())
+        else:
+            return await TelegramMessage.a_parse((await response.json())["result"])
 
     def get_file(self, file_id: int):
         url = self.url.format(token=self.token, method="getFile")
@@ -383,71 +445,83 @@ class TelegramAgent(Agent):
                               response.status, await response.text())
         return await response.json()
 
-    def edit_message(self, chat: Chat, message: Message, text: (str, None)=None,
-                     images: Iterator[Attachment]=[], audios: Iterator[Attachment]=[],
-                     documents: Iterator[Attachment]=[], videos: Iterator[Attachment]=[],
-                     locations: Iterator[Location]=[], keyboard: (Keyboard, None)=None,
-                     caption: (str, None)=None):
-        if text:
-            url = self.url.format(token=self.token, method="editMessageText")
-            data = {"chat_id": chat.id, "message_id": message.id, "text": message.text}
-            if keyboard is not None:
-                if hasattr(keyboard, "render"):
-                    data["reply_markup"] = keyboard.render()
-                else:
-                    data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
-            response = requests.post(url, data=data)
-        elif isinstance(keyboard, TelegramInlineKeyboard):
-            url = self.url.format(token=self.token, method="editMessageReplyMarkup")
-            data = {"chat_id": chat.id, "message_id": message.id}
-            data["reply_markup"] = keyboard.render()
-            response = requests.post(url, data=data)
+    def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str):
+        url = self.url.format(token=self.token, method="editMessageText")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
+        response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                self.name, response.status_code, response.text)
-        if caption is not None:
-            url = self.url.format(token=self.token, method="editMessageCaption")
-            data = {"chat_id": chat.id, "message_id": message.id, "caption": caption}
-            response = requests.post(url, data=data)
-            if response.status_code != 200:
-                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
+                              self.name, response.status_code, response.text)
 
-    async def a_edit_message(self, chat: Chat, message: Message, text: (str, None)=None,
-                             images: Iterator[Attachment]=[], audios: Iterator[Attachment]=[],
-                             documents: Iterator[Attachment]=[], videos: Iterator[Attachment]=[],
-                             locations: Iterator[Location]=[], keyboard: (Keyboard, None)=None,
-                             caption: (str, None)=None):
-        if text:
-            url = self.url.format(token=self.token, method="editMessageText")
-            data = {"chat_id": chat.id, "message_id": message.id, "text": message.text}
-            if keyboard is not None:
-                if hasattr(keyboard, "render"):
-                    data["reply_markup"] = keyboard.render()
-                else:
-                    data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
-            async with aiohttp.ClientSession() as session:
-                response = await session.post(url, data=data)
-        elif isinstance(keyboard, TelegramInlineKeyboard):
-            url = self.url.format(token=self.token, method="editMessageReplyMarkup")
-            data = {
-                "chat_id": chat.id,
-                "message_id": message.id,
-                "reply_markup": keyboard.render(),
-            }
-            async with aiohttp.ClientSession() as session:
-                response = await session.post(url, data=data)
+    async def a_edit_message_text(self, chat: Chat, message: TelegramMessage, text: str):
+        url = self.url.format(token=self.token, method="editMessageText")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                self.name, response.status, await response.text())
-        if caption is not None:
-            url = self.url.format(token=self.token, method="editMessageCaption")
-            data = {"chat_id": chat.id, "message_id": message.id, "caption": caption}
-            async with aiohttp.ClientSession() as session:
-                response = await session.post(url, data=data)
-            if response.status != 200:
-                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
+
+    def edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
+                              keyboard: TelegramInlineKeyboard):
+        url = self.url.format(token=self.token, method="editMessageReplyMarkup")
+        data = {
+            "chat_id": chat.id,
+            "message_id": message.raw["id"],
+            "reply_markup": keyboard.render(),
+        }
+        response = requests.post(url, data=data)
+        if response.status_code != 200:
+            self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                              self.name, response.status_code, response.text)
+
+    async def a_edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
+                                      keyboard: TelegramInlineKeyboard):
+        url = self.url.format(token=self.token, method="editMessageReplyMarkup")
+        data = {
+            "chat_id": chat.id,
+            "message_id": message.raw["id"],
+            "reply_markup": keyboard.render(),
+        }
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
+        if response.status != 200:
+            self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
+
+    def delete_message(self, chat: Chat, message: TelegramMessage):
+        url = self.url.format(token=self.token, method="deleteMessage")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"]}
+        response = requests.post(url, data=data)
+        if response.status_code != 200:
+            self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
+                              response.status_code, response.text)
+
+    async def a_delete_message(self, chat: Chat, message: TelegramMessage):
+        url = self.url.format(token=self.token, method="deleteMessage")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"]}
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
+        if response.status != 200:
+            self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
+                              response.status, await response.text())
+
+    def send_chat_action(self, chat: Chat, action: str):
+        url = self.url.format(token=self.token, method="sendChatAction")
+        data = {"chat_id": chat.id, "action": action}
+        response = requests.post(url, data=data)
+        if response.status_code != 200:
+            self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
+                              self.name, response.status_code, response.text)
+
+    async def a_send_chat_action(self, chat: Chat, action: str):
+        url = self.url.format(token=self.token, method="sendChatAction")
+        data = {"chat_id": chat.id, "action": action}
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
+        if response.status != 200:
+            self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
 
     """
     def get_me(self):
@@ -526,23 +600,83 @@ class TelegramAgent(Agent):
 
 
 class TelegramUser(Chat):
-    def __init__(self, agent: TelegramAgent, id: int, bot: bool, first_name: str,
+    def __init__(self, agent: TelegramAgent, id: int, is_bot: bool, first_name: str,
                  last_name: (str, None)=None, username: (str, None)=None,
                  language: (str, None)=None):
-        super().__init__(agent=agent, id=username or str(id), bot=bot, first_name=first_name,
-                         last_name=last_name, username=username, language=language, user_id=id)
+        super().__init__(agent=agent, id=str(id), is_bot=is_bot, first_name=first_name,
+                         last_name=last_name, username=username, language=language)
 
     @classmethod
     def parse(cls, agent: TelegramAgent, data: dict):
         return cls(
             agent=agent,
             id=data["id"],
-            bot=data["is_bot"],
-            first_name=data.get["first_name"],
+            is_bot=data["is_bot"],
+            first_name=data["first_name"],
             last_name=data.get("last_name"),
             username=data.get("username"),
             language=data.get("language_code"),
         )
+
+    def render(self):
+        data = {"id": self.id, "is_bot": self.raw["is_bot"], "first_name": self.raw["first_name"]}
+        if "last_name" in self.raw:
+            data["last_name"] = self.raw["last_name"]
+        if "username" in self.raw:
+            data["username"] = self.raw["username"]
+        if "language" in self.raw:
+            data["language_code"] = self.raw["language"]
+        return data
+
+    @property
+    def is_bot(self) -> bool:
+        return self.raw["is_bot"]
+
+    @is_bot.setter
+    def is_bot_setter(self, value: bool):
+        self.raw["is_bot"] = value
+
+    @property
+    def first_name(self) -> str:
+        return self.raw["first_name"]
+
+    @first_name.setter
+    def first_name_setter(self, value: str):
+        self.raw["first_name"] = value
+
+    @property
+    def last_name(self) -> (str, None):
+        return self.raw.get("last_name")
+
+    @last_name.setter
+    def last_name_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["last_name"] = value
+        elif "last_name" in self.raw:
+            del self.raw["last_name"]
+
+    @property
+    def username(self) -> (str, None):
+        return self.raw.get("username")
+
+    @username.setter
+    def username_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["username"] = value
+        elif "username" in self.raw:
+            del self.raw["username"]
+
+    @property
+    def language(self) -> (str, None):
+        return self.raw.get("langugage")
+
+    @language.setter
+    def language_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["language"] = value
+        elif "language" in self.raw:
+            del self.raw["language"]
+
 
 class TelegramChat(Chat):
     def __init__(self, agent: TelegramAgent, id: int, type: str, title: (str, None)=None,
@@ -576,9 +710,166 @@ class TelegramChat(Chat):
             can_set_sticker=data.get("can_set_sticker_set"),
         )
 
+    def render(self):
+        data = {"id": self.id, "type": self.raw["type"]}
+        if "title" in self.raw:
+            data["title"] = self.raw["title"]
+        if "username" in self.raw:
+            data["username"] = self.raw["username"]
+        if "first_name" in self.raw:
+            data["first_name"] = self.raw["first_name"]
+        if "last_name" in self.raw:
+            data["last_name"] = self.raw["last_name"]
+        if "photo" in self.raw:
+            data["photo"] = self.raw["photo"]
+        if "description" in self.raw:
+            data["description"] = self.raw["description"]
+        if "invite_link" in self.raw:
+            data["invite_link"] = self.raw["invite_link"]
+        if "pinned_message" in self.raw:
+            data["pinned_message"] = self.raw["pinned_message"]
+        if "permissions" in self.raw:
+            data["permissions"] = self.raw["permissions"]
+        if "sticker_set" in self.raw:
+            data["sticker_set_name"] = self.raw["sticker_set"]
+        if "can_set_sticker" in self.raw:
+            data["can_set_sticker_set"] = self.raw["can_set_sticker"]
+        return data
 
+    @property
+    def type(self) -> str:
+        return self.raw["type"]
+
+    @type.setter
+    def type_setter(self, value: str):
+        self.raw["type"] = value
+
+    @property
+    def title(self) -> (str, None):
+        return self.raw.get("title")
+
+    @title.setter
+    def title_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["title"] = value
+        elif "title" in self.raw:
+            del self.raw["title"]
+
+    @property
+    def username(self) -> (str, None):
+        return self.raw.get("username")
+
+    @username.setter
+    def username_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["username"] = value
+        elif "username" in self.raw:
+            del self.raw["username"]
+
+    @property
+    def first_name(self) -> (str, None):
+        return self.raw.get("first_name")
+
+    @first_name.setter
+    def first_name_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["first_name"] = value
+        elif "first_name" in self.raw:
+            del self.raw["first_name"]
+
+    @property
+    def last_name(self) -> (str, None):
+        return self.raw.get("last_name")
+
+    @last_name.setter
+    def last_name_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["last_name"] = value
+        elif "last_name" in self.raw:
+            del self.raw["last_name"]
+
+    @property
+    def photo(self) -> (str, None):
+        return self.raw["photo"]
+
+    @photo.setter
+    def photo_setter(self, value: (dict, None)):
+        if value is not None:
+            self.raw["photo"] = value
+        elif "photo" in self.raw:
+            del self.raw["photo"]
+
+    @property
+    def description(self) -> (str, None):
+        return self.raw.get("description")
+
+    @description.setter
+    def description_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["description"] = value
+        elif "description" in self.raw:
+            del self.raw["description"]
+
+    @property
+    def invite_link(self) -> (str, None):
+        return self.raw.get("invite_link")
+
+    @invite_link.setter
+    def invite_link_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["invite_link"] = value
+        elif "invite_link" in self.raw:
+            del self.raw["invite_link"]
+
+    @property
+    def pinned_message(self) -> (TelegramMessage, None):
+        if "pinned_message" in self.raw:
+            return TelegramMessage.parse(data=self.raw["pinned_message"])
+
+    @pinned_message.setter
+    def pinned_message_setter(self, value: (TelegramMessage, None)):
+        if value is not None:
+            self.raw["pinned_message"] = value.render()
+        elif "pinned_message" in self.raw:
+            del self.raw["pinned_message"]
+
+    @property
+    def permissions(self) -> (dict, None):
+        return self.raw.get("permissions")
+
+    @permissions.setter
+    def permissions_setter(self, value: (dict, None)):
+        if value is not None:
+            self.raw["permissions"] = value
+        elif "permissions" in self.raw:
+            del self.raw["permissons"]
+
+    @property
+    def sticker_set(self) -> (str, None):
+        return self.raw.get("sticker_set")
+
+    @sticker_set.setter
+    def sticker_set_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["sticker_set"] = value
+        elif "sticker_set" in self.raw:
+            del self.raw["sticker_set"]
+
+    @property
+    def can_set_sticker(self) -> (bool, None):
+        return self.raw.get("can_set_sticker")
+
+    @can_set_sticker.setter
+    def can_set_sticker_setter(self, value: (bool, None)):
+        if value is not None:
+            self.raw["can_set_sticker"] = value
+        elif "can_set_sticker" in self.raw:
+            del self.raw["can_set_sticker"]
+
+
+# Нужны остальные необязательные поля
 class TelegramMessage(Message):
-    def __init__(self, id: str, datetime: datetime, chat: dict, text: (str, None)=None,
+    def __init__(self, id: int, datetime: int, chat: dict, text: (str, None)=None,
                  images: Iterator[Attachment]=[], audios: Iterator[Attachment]=[],
                  videos: Iterator[Attachment]=[], documents: Iterator[Attachment]=[],
                  locations: Iterator[Location]=[]):
@@ -586,29 +877,25 @@ class TelegramMessage(Message):
                          audios=audios, videos=videos, documents=documents, locations=locations)
 
     @classmethod
-    def parse(cls, agent: TelegramAgent, data: dict, load_attachments: bool=False):
+    def parse(cls, data: dict, agent: (TelegramAgent, None)=None):
         images = []
         audios = []
         videos = []
         documents = []
         locations = []
-        for photo in data.get("photo", []):
-            images.append(TelegramAttachment.parse(agent=agent, data=photo,
-                                                   load_attachments=load_attachments))
+        if "photo" in data:
+            images.append(TelegramAttachment.parse(data=data["photo"][-1], agent=agent))
         if "audio" in data:
-            audios.append(TelegramAttachment.parse(agent=agent, data=data["audio"],
-                                                   load_attachments=load_attachments))
+            audios.append(TelegramAttachment.parse(data=data["audio"], agent=agent))
         if "video" in data:
-            videos.append(TelegramAttachment.parse(agent=agent, data=data["video"],
-                                                   load_attachments=load_attachments))
+            videos.append(TelegramAttachment.parse(data=data["video"], agent=agent))
         if "document" in data:
-            documents.append(TelegramAttachment.parse(agent=agent, data=data["document"],
-                                                      load_attachments=load_attachments))
+            documents.append(TelegramAttachment.parse(data=data["document"], agent=agent))
         if "location" in data:
             locations.append(TelegramLocation.parse(data=data["location"]))
         return cls(
             id=data["message_id"],
-            datetime=datetime.utcfromtimestamp(data["date"]),
+            datetime=data["date"],
             chat=data.get("chat"),
             text=data.get("text"),
             images=images,
@@ -619,30 +906,26 @@ class TelegramMessage(Message):
         )
 
     @classmethod
-    async def a_parse(cls, agent: TelegramAgent, data: dict, load_attachments: bool=False):
+    async def a_parse(cls, data: dict, agent: (TelegramAgent, None)=None):
         images = []
         audios = []
         videos = []
         documents = []
         locations = []
-        for photo in data.get("photo", []):
-            images.append(await TelegramAttachment.a_parse(agent=agent, data=photo,
-                                                           load_attachments=load_attachments))
+        if "photo" in data:
+            images.append(await TelegramAttachment.a_parse(data=data["photo"][-1], agent=agent))
         if "audio" in data:
-            audios.append(await TelegramAttachment.a_parse(agent=agent, data=data["audio"],
-                                                           load_attachments=load_attachments))
+            audios.append(await TelegramAttachment.a_parse(data=data["audio"], agent=agent))
         if "video" in data:
-            videos.append(await TelegramAttachment.a_parse(agent=agent, data=data["video"],
-                                                           load_attachments=load_attachments))
+            videos.append(await TelegramAttachment.a_parse(data=data["video"], agent=agent))
         if "document" in data:
-            documents.append(await TelegramAttachment.a_parse(agent=agent, data=data["document"],
-                                                              load_attachments=load_attachments))
+            documents.append(await TelegramAttachment.a_parse(data=data["document"], agent=agent))
         if "location" in data:
             locations.append(TelegramLocation.parse(data=data["location"]))
         return cls(
             id=data["message_id"],
-            datetime=datetime.utcfromtimestamp(data["date"]),
-            chat=TelegramChat.parse(agent=agent, data=data["chat"]),
+            datetime=data["date"],
+            chat=data["chat"],
             text=data.get("text"),
             images=images,
             audios=audios,
@@ -650,6 +933,40 @@ class TelegramMessage(Message):
             documents=documents,
             locations=locations,
         )
+
+    def render(self):
+        data = {
+            "message_id": self.raw["id"],
+            "date": self.raw["datetime"],
+            "chat": self.raw["chat"],
+        }
+        if self.text is not None:
+            data["text"] = self.text
+        return data
+
+    @property
+    def id(self) -> int:
+        return self.raw["id"]
+
+    @id.setter
+    def id_setter(self, value: int):
+        self.raw["id"] = value
+
+    @property
+    def datetime(self) -> datetime:
+        return datetime.utcfromtimestamp(self.raw["datetime"])
+
+    @datetime.setter
+    def datetime_setter(self, value: datetime):
+        self.raw["datetime"] = datetime.timestamp()
+
+    @property
+    def chat(self) -> Chat:
+        return TelegramChat.parse(agent=None, data=self.raw["chat"])
+
+    @chat.setter
+    def chat_setter(self, value: TelegramChat):
+        self.raw["chat"] = value.render()
 
 
 class TelegramCallback(Message):
@@ -663,7 +980,7 @@ class TelegramCallback(Message):
     @classmethod
     def parse(cls, data: dict):
         return cls(
-            id=data["message_id"],
+            id=data["id"],
             user=data["from"],
             message=data.get("message"),
             inline_message_id=data.get("inline_message_id"),
@@ -672,6 +989,93 @@ class TelegramCallback(Message):
             game_short_name=data.get("game_short_name"),
         )
 
+    def render(self):
+        data = {"id": self.raw["id"], "from": self.raw["user"]}
+        if "message" in self.raw:
+            data["message"] = self.raw["message"]
+        if "inline_message_id" in self.raw:
+            data["inline_message_id"] = self.raw["inline_message_id"]
+        if "chat_instance" in self.raw:
+            data["chat_instance"] = self.raw["chat_instance"]
+        if "data" in self.raw:
+            data["data"] = self.raw["data"]
+        if "game_short_name" in self.raw:
+            data["game_short_name"] = self.raw["game_short_name"]
+
+    @property
+    def id(self) -> str:
+        return self.raw["id"]
+
+    @id.setter
+    def id_setter(self, value: str):
+        self.raw["id"] = value
+
+    @property
+    def user(self) -> dict:
+        return self.raw["user"]
+
+    @user.setter
+    def user_setter(self, value: dict):
+        self.raw["user"] = value
+
+    @property
+    def message(self) -> (TelegramMessage, None):
+        if "message" in self.raw:
+            return TelegramMessage.parse(data=self.raw["message"])
+        else:
+            return None
+
+    @message.setter
+    def message_setter(self, value: (TelegramMessage, None)):
+        if value is not None:
+            self.raw["message"] = value.render()
+        elif "message" in self.raw:
+            del self.raw["message"]
+
+    @property
+    def inline_message_id(self) -> (str, None):
+        return self.raw.get("inline_message_id")
+
+    @inline_message_id.setter
+    def inline_message_id_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["inline_message_id"] = value
+        elif "inline_message_id" in self.raw:
+            del self.raw["inline_message_id"]
+
+    @property
+    def chat_instance(self) -> (str, None):
+        return self.raw.get("chat_instance")
+
+    @chat_instance.setter
+    def chat_instance_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["chat_instance"] = value
+        elif "chat_instance" in self.raw:
+            del self.raw["chat_instance"]
+
+    @property
+    def data(self) -> (str, None):
+        return self.raw.get("data")
+
+    @data.setter
+    def data_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["data"] = value
+        elif "data" in self.raw:
+            del self.raw["data"]
+
+    @property
+    def game_short_name(self) -> (str, None):
+        return self.raw.get("game_short_name")
+
+    @game_short_name.setter
+    def game_short_name_setter(self, value: (str, None)):
+        if value is not None:
+            self.raw["game_short_name"] = value
+        elif "game_short_name" in self.raw:
+            del self.raw["game_short_name"]
+
 
 class TelegramAttachment(Attachment):
     def __init__(self, url: (str, None)=None, filepath: (str, None)=None, id: (str, None)=None,
@@ -679,11 +1083,11 @@ class TelegramAttachment(Attachment):
         super().__init__(url=url, filepath=filepath, id=id, size=size)
 
     @classmethod
-    def parse(cls, agent: TelegramAgent, data: dict, load_attachments: bool=False):
-        if load_attachments:
-            url = agent.get_file(data["file_id"])["result"]["file_path"]
-        else:
+    def parse(cls, data: dict, agent: (TelegramAgent, None)):
+        if agent is None:
             url = None
+        else:
+            url = agent.get_file(data["file_id"])["result"]["file_path"]
         return cls(
             id=data["file_id"],
             url=None if url is None else agent.url.format(token=agent.token, method=url),
@@ -691,16 +1095,41 @@ class TelegramAttachment(Attachment):
         )
 
     @classmethod
-    async def a_parse(cls, agent: TelegramAgent, data: dict, load_attachments: bool=False):
-        if load_attachments:
-            url = await agent.a_get_file(data["file_id"])["result"]["file_path"]
-        else:
+    async def a_parse(cls, data: dict, agent: (TelegramAgent, None)=None):
+        if agent is None:
             url = None
+        else:
+            url = (await agent.a_get_file(data["file_id"]))["result"]["file_path"]
         return cls(
             id=data["file_id"],
             url=None if url is None else agent.url.format(token=agent.token, method=url),
             size=data["file_size"],
         )
+
+    @property
+    def id(self):
+        return self.raw["id"]
+
+    @id.setter
+    def id_setter(self, value: (str, None)):
+        if id is not None:
+            self.raw["id"] = id
+        else:
+            del self.raw["id"]
+
+    @property
+    def size(self):
+        return self.raw["size"]
+
+    @size.setter
+    def size_setter(self, value: (int, None)):
+        if value is not None:
+            self.raw["size"] = value
+        else:
+            del self.raw["size"]
+
+
+# STOP HERE
 
 
 class TelegramLocation(Location):
@@ -722,22 +1151,25 @@ class TelegramVenue(Location):
 
 
 class TelegramKeyboard(Keyboard):
-    def __init__(self, buttons: Iterator[Iterator[TelegramKeyboardButton]], resize: bool=False,
+    def __init__(self, buttons: Iterator[Iterator[KeyboardButton]], resize: bool=False,
                  one_time: bool=False, selective: bool=False):
         super().__init__(buttons=buttons, resize=resize, one_time=one_time, selective=selective)
 
     def render(self):
         data = {
             "keyboard": [],
-            "resize_keyboard": self.resize,
-            "one_time_keyboard": self.one_time,
-            "selective": self.selective,
+            "resize_keyboard": self.raw["resize"],
+            "one_time_keyboard": self.raw["one_time"],
+            "selective": self.raw["selective"],
         }
         for line in self.buttons:
             line_data = []
             data["keyboard"].append(line_data)
             for button in line:
-                line_data.append(button.render())
+                if hasattr(button, "render"):
+                    line_data.append(button.render())
+                else:
+                    line_data.append(button.text)
         return json.dumps(data)
 
     @staticmethod
@@ -752,14 +1184,14 @@ class TelegramKeyboard(Keyboard):
 
 
 class TelegramInlineKeyboard(Keyboard):
-    def __init__(self, buttons: Iterator[Iterator[TelegramKeyboardButton]]):
+    def __init__(self, buttons: Iterator[Iterator[TelegramInlineKeyboardButton]]):
         super().__init__(buttons=buttons)
 
     def render(self):
         data = {"inline_keyboard": []}
         for line in self.buttons:
             line_data = []
-            data["keyboard"].append(line_data)
+            data["inline_keyboard"].append(line_data)
             for button in line:
                 line_data.append(button.render())
         return json.dumps(data)
@@ -771,8 +1203,8 @@ class TelegramKeyboardButton(KeyboardButton):
     def render(self):
         return {
             "text": self.text,
-            "request_contact": self.contact,
-            "request_location": self.location,
+            "request_contact": self.raw["contact"],
+            "request_location": self.raw["location"],
         }
 
 class TelegramInlineKeyboardButton(KeyboardButton):
@@ -783,14 +1215,13 @@ class TelegramInlineKeyboardButton(KeyboardButton):
                          inline_chat=inline_chat, game=game)
 
     def render(self):
-        data = {"text": self.text, "callback_game": self.game}
-        if self.url is not None:
-            data["url"] = self.url
-        if self.data is not None:
-            data["callback_data"] = self.data
-        if self.inline_query is not None:
-            data["switch_inline_query"] = self.inline_query
-        if self.inline_chat is not None:
-            data["switch_inline_query_current_chat"] = self.inline_chat
+        data = {"text": self.text, "callback_game": self.raw["game"]}
+        if "url" in self.raw:
+            data["url"] = self.raw["url"]
+        if "data" in self.raw:
+            data["callback_data"] = self.raw["data"]
+        if "inline_query" in self.raw:
+            data["switch_inline_query"] = self.raw["inline_query"]
+        if "inline_chat" in self.raw:
+            data["switch_inline_query_current_chat"] = self.raw["inline_chat"]
         return data
-        

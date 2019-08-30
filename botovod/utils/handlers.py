@@ -1,16 +1,20 @@
 from botovod.agents import Agent, Chat, Message
+from botovod.agents.telegram import TelegramAgent, TelegramCallback
 from botovod.utils.exceptions import NotPassed
+from functools import wraps
 import re
 from typing import Callable
 
 
 def to_text(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if message.text is None:
                 raise NotPassed
             return func(agent, chat, message.text)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if self.message.text is None:
                 raise NotPassed
@@ -23,6 +27,7 @@ def to_text(is_dialog: bool=False):
 
 def to_attachments(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             attachments = []
             attachments.extend(message.images)
@@ -33,6 +38,7 @@ def to_attachments(is_dialog: bool=False):
                 raise NotPassed
             return func(agent, chat, attachments)
 
+        @wraps(func)
         def dialog_wrapper(self):
             attachments = []
             attachments.extend(self.message.images)
@@ -50,11 +56,13 @@ def to_attachments(is_dialog: bool=False):
 
 def to_images(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not message.images:
                 raise NotPassed
             return func(agent, chat, message.images)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not self.message.images:
                 raise NotPassed
@@ -67,11 +75,13 @@ def to_images(is_dialog: bool=False):
 
 def to_audios(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not message.audios:
                 raise NotPassed
             return func(agent, chat, message.audios)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not self.message.audios:
                 raise NotPassed
@@ -84,11 +94,13 @@ def to_audios(is_dialog: bool=False):
 
 def to_videos(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not message.videos:
                 raise NotPassed
             return func(agent, chat, message.videos)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not self.message.videos:
                 raise NotPassed
@@ -101,11 +113,13 @@ def to_videos(is_dialog: bool=False):
 
 def to_documents(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not message.documents:
                 raise NotPassed
             return func(agent, chat, message.documents)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not self.message.documents:
                 raise NotPassed
@@ -118,11 +132,13 @@ def to_documents(is_dialog: bool=False):
 
 def to_locations(is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not message.locations:
                 raise NotPassed
             return func(agent, chat, message.locations)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not self.message.locations:
                 raise NotPassed
@@ -135,6 +151,7 @@ def to_locations(is_dialog: bool=False):
 
 def only_regexp(expression: str, is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if message.text is None:
                 raise NotPassed
@@ -143,6 +160,7 @@ def only_regexp(expression: str, is_dialog: bool=False):
                 raise NotPassed
             return func(agent, chat, *match.groups())
 
+        @wraps(func)
         def dialog_wrapper(self):
             if self.message.text is None:
                 raise NotPassed
@@ -158,11 +176,13 @@ def only_regexp(expression: str, is_dialog: bool=False):
 
 def only_agent(name: str, is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if agent.name != name:
                 raise NotPassed
             return func(agent, chat, message)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if self.agent.name != name:
                 raise NotPassed
@@ -175,6 +195,7 @@ def only_agent(name: str, is_dialog: bool=False):
 
 def only_chat(chat: Chat, cls: Agent=Agent, is_dialog: bool=False):
     def decorator(func: Callable):
+        @wraps(func)
         def func_wrapper(agent: Agent, chat: Chat, message: Message):
             if not issubclass(agent, cls):
                 raise NotPassed
@@ -182,12 +203,32 @@ def only_chat(chat: Chat, cls: Agent=Agent, is_dialog: bool=False):
                 raise NotPassed
             return func(agent, chat, message)
 
+        @wraps(func)
         def dialog_wrapper(self):
             if not issubclass(self.agent, cls):
                 raise NotPassed
             if self.message.chat.id != chat:
                 raise NotPassed
             return func(self)
+
+        return dialog_wrapper if is_dialog else func_wrapper
+
+    return decorator
+
+
+def only_telegram_callback(is_dialog: bool=False):
+    def decorator(func: Callable):
+        @wraps(func)
+        def func_wrapper(agent: Agent, chat: Chat, message: Message):
+            if isinstance(agent, TelegramAgent) and isinstance(message, TelegramCallback):
+                return func(agent, chat, message)
+            raise NotPassed
+
+        @wraps(func)
+        def dialog_wrapper(self):
+            if isinstance(self.agent, TelegramAgent) and isinstance(self.message, TelegramCallback):
+                return func(self, self.message.text)
+            raise NotPassed
 
         return dialog_wrapper if is_dialog else func_wrapper
 

@@ -93,7 +93,6 @@ class Chat:
         self.id = id
         self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
-
 class Message:
     def __init__(self, text: (str, None)=None, images: Iterator[Attachment]=[],
                  audios: Iterator[Attachment]=[], videos: Iterator[Attachment]=[],
