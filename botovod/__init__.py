@@ -34,8 +34,15 @@ class Botovod:
         self.agents = AgentDict(self)
         self.handlers = []
         self.logger = logger
+        self.dict = {}
 
         logger.info("Initialiaze Botovod.")
+
+    def __setitem__(self, name: str, value):
+        self.dict[name] = value
+
+    def __getitem__(self, name: str):
+        return self.dict[name]
 
     def start(self):
         for agent in self.agents.values():

@@ -71,9 +71,11 @@ class AsyncDialog:
         if dialog_name is not None and dialog_name != cls.__name__:
             raise NotPassed
         
+        next_step = "start"
         if dialog_name is None:
             await dialog.follower.a_set_dialog(cls.__name__)
-        next_step = await dialog.follower.a_get_next_step()
+        else:
+            next_step = await dialog.follower.a_get_next_step()
         if next_step:
             await getattr(dialog, next_step)()
         else:

@@ -17,7 +17,8 @@ class TelegramAgent(Agent):
     WEBHOOK = "webhook"
     POLLING = "polling"
 
-    url = "https://api.telegram.org/bot{token}/{method}"
+    BASE_URL = "https://api.telegram.org/bot{token}/{method}"
+    FILE_URL = "https://api.telegram.org/file/bot{token}/{file_path}"
 
     def __init__(self, token: str, method: str=POLLING, delay: int=5, daemon: bool=False,
                  webhook_url: (str, None)=None, certificate_path: (str, None)=None,
@@ -129,7 +130,7 @@ class TelegramAgent(Agent):
         return self.responser(headers=headers, body=body)
 
     def polling(self):
-        url = self.url.format(token=self.token, method="getUpdates")
+        url = self.BASE_URL.format(token=self.token, method="getUpdates")
         while self.running:
             try:
                 params = {"offset": self.last_update + 1} if self.last_update > 0 else {}
@@ -145,7 +146,7 @@ class TelegramAgent(Agent):
                 time.sleep(self.delay)
 
     async def a_polling(self):
-        url = self.url.format(token=self.token, method="getUpdates")
+        url = self.BASE_URL.format(token=self.token, method="getUpdates")
         while self.running:
             try:
                 params = {"offset": self.last_update + 1} if self.last_update > 0 else {}
@@ -163,7 +164,7 @@ class TelegramAgent(Agent):
 
     def send_attachment(self, type: str, chat: Chat, attachment: Attachment,
                         keyboard: (Keyboard, None)=None):
-        url = self.url.format(token=self.token, method="send" + type.capitalize())
+        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
         data = {"chat_id": chat.id}
         if "id" in attachment.raw:
             data[type] = attachment.raw["id"]
@@ -188,7 +189,7 @@ class TelegramAgent(Agent):
 
     async def a_send_attachment(self, type: str, chat: Chat, attachment: Attachment,
                                 keyboard: (Keyboard, None)=None):
-        url = self.url.format(token=self.token, method="send" + type.capitalize())
+        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
         data = {"chat_id": chat.id}
         if "id" in attachment.raw:
             data[type] = attachment.raw["id"]
@@ -215,7 +216,7 @@ class TelegramAgent(Agent):
     def set_webhook(self):
         self.logger.info("[%s:%s] Setting webhook...", self, self.name)
 
-        url = self.url.format(token=self.token, method="setWebhook")
+        url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
             if self.certificate_path is not None:
                 with open(self.certificate_path) as file:
@@ -238,7 +239,7 @@ class TelegramAgent(Agent):
     async def a_set_webhook(self):
         self.logger.info("[%s:%s] Setting webhook...", self, self.name)
 
-        url = self.url.format(token=self.token, method="setWebhook")
+        url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
             if self.certificate_path is not None:
                 async with aiohttp.ClientSession() as session:
@@ -269,7 +270,7 @@ class TelegramAgent(Agent):
                      reply: (Message, None)=None):
         messages = []
         if text is not None:
-            url = self.url.format(token=self.token, method="sendMessage")
+            url = self.BASE_URL.format(token=self.token, method="sendMessage")
             data = {
                 "chat_id": chat.id,
                 "text": text,
@@ -321,7 +322,7 @@ class TelegramAgent(Agent):
                              notification: bool=True, reply: (Message, None)=None):
         messages = []
         if text is not None:
-            url = self.url.format(token=self.token, method="sendMessage")
+            url = self.BASE_URL.format(token=self.token, method="sendMessage")
             data = {
                 "chat_id": chat.id,
                 "text": text,
@@ -397,7 +398,7 @@ class TelegramAgent(Agent):
                                             keyboard=keyboard)
 
     def send_location(self, chat: Chat, location: Location, keyboard: (Keyboard, None)=None):
-        url = self.url.format(token=self.token, method="sendLocation")
+        url = self.BASE_URL.format(token=self.token, method="sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
         if keyboard is not None:
             if hasattr(keyboard, "render"):
@@ -413,7 +414,7 @@ class TelegramAgent(Agent):
 
     async def a_send_location(self, chat: Chat, location: Location,
                               keyboard: (Keyboard, None)=None):
-        url = self.url.format(token=self.token, method="sendLocation")
+        url = self.BASE_URL.format(token=self.token, method="sendLocation")
         data = {"chat_id": chat.id, "longitude": location.longitude, "latitude": location.latitude}
         if keyboard is not None:
             if hasattr(keyboard, "render"):
@@ -429,7 +430,7 @@ class TelegramAgent(Agent):
             return await TelegramMessage.a_parse((await response.json())["result"])
 
     def get_file(self, file_id: int):
-        url = self.url.format(token=self.token, method="getFile")
+        url = self.BASE_URL.format(token=self.token, method="getFile")
         response = requests.get(url, params={"file_id": file_id})
         if response.status_code != 200:
             self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
@@ -437,7 +438,7 @@ class TelegramAgent(Agent):
         return response.json()
 
     async def a_get_file(self, file_id: int):
-        url = self.url.format(token=self.token, method="getFile")
+        url = self.BASE_URL.format(token=self.token, method="getFile")
         async with aiohttp.ClientSession() as session:
             response = await session.get(url, params={"file_id": file_id})
         if response.status != 200:
@@ -446,7 +447,7 @@ class TelegramAgent(Agent):
         return await response.json()
 
     def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str):
-        url = self.url.format(token=self.token, method="editMessageText")
+        url = self.BASE_URL.format(token=self.token, method="editMessageText")
         data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
         response = requests.post(url, data=data)
         if response.status_code != 200:
@@ -454,7 +455,7 @@ class TelegramAgent(Agent):
                               self.name, response.status_code, response.text)
 
     async def a_edit_message_text(self, chat: Chat, message: TelegramMessage, text: str):
-        url = self.url.format(token=self.token, method="editMessageText")
+        url = self.BASE_URL.format(token=self.token, method="editMessageText")
         data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
@@ -464,7 +465,7 @@ class TelegramAgent(Agent):
 
     def edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
                               keyboard: TelegramInlineKeyboard):
-        url = self.url.format(token=self.token, method="editMessageReplyMarkup")
+        url = self.BASE_URL.format(token=self.token, method="editMessageReplyMarkup")
         data = {
             "chat_id": chat.id,
             "message_id": message.raw["id"],
@@ -477,7 +478,7 @@ class TelegramAgent(Agent):
 
     async def a_edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
                                       keyboard: TelegramInlineKeyboard):
-        url = self.url.format(token=self.token, method="editMessageReplyMarkup")
+        url = self.BASE_URL.format(token=self.token, method="editMessageReplyMarkup")
         data = {
             "chat_id": chat.id,
             "message_id": message.raw["id"],
@@ -490,7 +491,7 @@ class TelegramAgent(Agent):
                               self.name, response.status, await response.text())
 
     def delete_message(self, chat: Chat, message: TelegramMessage):
-        url = self.url.format(token=self.token, method="deleteMessage")
+        url = self.BASE_URL.format(token=self.token, method="deleteMessage")
         data = {"chat_id": chat.id, "message_id": message.raw["id"]}
         response = requests.post(url, data=data)
         if response.status_code != 200:
@@ -498,7 +499,7 @@ class TelegramAgent(Agent):
                               response.status_code, response.text)
 
     async def a_delete_message(self, chat: Chat, message: TelegramMessage):
-        url = self.url.format(token=self.token, method="deleteMessage")
+        url = self.BASE_URL.format(token=self.token, method="deleteMessage")
         data = {"chat_id": chat.id, "message_id": message.raw["id"]}
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
@@ -507,7 +508,7 @@ class TelegramAgent(Agent):
                               response.status, await response.text())
 
     def send_chat_action(self, chat: Chat, action: str):
-        url = self.url.format(token=self.token, method="sendChatAction")
+        url = self.BASE_URL.format(token=self.token, method="sendChatAction")
         data = {"chat_id": chat.id, "action": action}
         response = requests.post(url, data=data)
         if response.status_code != 200:
@@ -515,7 +516,7 @@ class TelegramAgent(Agent):
                               self.name, response.status_code, response.text)
 
     async def a_send_chat_action(self, chat: Chat, action: str):
-        url = self.url.format(token=self.token, method="sendChatAction")
+        url = self.BASE_URL.format(token=self.token, method="sendChatAction")
         data = {"chat_id": chat.id, "action": action}
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
@@ -574,11 +575,6 @@ class TelegramAgent(Agent):
     def get_user_profile_photo(self, user_id):
         pass
     
-    def get_file(self, file_id):
-        url = self.url % (self.token, "getFile")
-        response = requests.get(url, data = {"file_id": file_id})
-        return response.text
-
     def kick_chat_member(self, chat, user_id):
         pass
     
@@ -1087,24 +1083,18 @@ class TelegramAttachment(Attachment):
         if agent is None:
             url = None
         else:
-            url = agent.get_file(data["file_id"])["result"]["file_path"]
-        return cls(
-            id=data["file_id"],
-            url=None if url is None else agent.url.format(token=agent.token, method=url),
-            size=data["file_size"],
-        )
+            file_path = agent.get_file(data["file_id"])["result"]["file_path"]
+            url = agent.FILE_URL.format(token=agent.token, file_path=file_path),
+        return cls(id=data["file_id"], url=url, size=data["file_size"])
 
     @classmethod
     async def a_parse(cls, data: dict, agent: (TelegramAgent, None)=None):
         if agent is None:
             url = None
         else:
-            url = (await agent.a_get_file(data["file_id"]))["result"]["file_path"]
-        return cls(
-            id=data["file_id"],
-            url=None if url is None else agent.url.format(token=agent.token, method=url),
-            size=data["file_size"],
-        )
+            file_path = (await agent.a_get_file(data["file_id"]))["result"]["file_path"]
+            url = agent.FILE_URL.format(token=agent.token, file_path=file_path)
+        return cls(id=data["file_id"], url=url, size=data["file_size"])
 
     @property
     def id(self):

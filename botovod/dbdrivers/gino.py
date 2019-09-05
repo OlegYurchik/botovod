@@ -182,9 +182,9 @@ class DBDriver(dbdrivers.DBDriver):
         await cls.db.gino.create_all()
 
     @classmethod
-    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Follower:
-        return await Follower.query.where(
-            Follower.bot == agent.__class__.__name__ and Follower.chat == chat.id
+    async def a_get_follower(cls, agent: Agent, chat: Chat) -> (Follower, None):
+        return await Follower.query.where(Follower.bot == agent.__class__.__name__).where(
+            Follower.chat == chat.id
         ).gino.first()
 
     @classmethod
@@ -193,6 +193,6 @@ class DBDriver(dbdrivers.DBDriver):
 
     @classmethod
     async def a_delete_follower(cls, agent: Agent, chat: Chat):
-        await Follower.delete.where(
-            Follower.bot == agent.__class__.__name__ and Follower.chat == chat.id
+        await Follower.delete.where(Follower.bot == agent.__class__.__name__).where(
+            Follower.chat == chat.id
         ).gino.status()
