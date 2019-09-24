@@ -6,6 +6,9 @@ import logging
 from typing import Any, Callable, Iterator
 
 
+logger = logging.getLogger(__name__)
+
+
 class Dialog:
     def __init__(self, agent: Agent, chat: Chat, message: Message):
         self.agent = agent
@@ -22,10 +25,12 @@ class Dialog:
         dialog_name = dialog.follower.get_dialog()
         if dialog_name is not None and dialog_name != cls.__name__:
             raise NotPassed
-        
+
         if dialog_name is None:
             dialog.follower.set_dialog(cls.__name__)
         next_step = dialog.follower.get_next_step()
+        logger.info("[%s:%s] Follower: %s; dialog: %s; step: %s", agent, agent.name,
+                    dialog.follower.chat, cls, next_step)
         if next_step:
             getattr(dialog, next_step)()
         else:
@@ -76,6 +81,8 @@ class AsyncDialog:
             await dialog.follower.a_set_dialog(cls.__name__)
         else:
             next_step = await dialog.follower.a_get_next_step()
+        logger.info("[%s:%s] Follower: %s; dialog: %s; step: %s", agent, agent.name,
+                    dialog.follower.chat, cls, next_step)
         if next_step:
             await getattr(dialog, next_step)()
         else:

@@ -9,6 +9,7 @@ from typing import Dict, Iterable
 
 
 db = gino.Gino()
+logger = logging.getLogger(__name__)
 
 
 class Common:
@@ -33,8 +34,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
         return self.dialog
 
     async def a_set_dialog(self, name: (str, None)=None):
-        await self.update(dialog=name).apply()
-        await self.a_set_next_step(None if name is None else "start")
+        await self.update(dialog=name, next_step=None if name is None else "start").apply()
 
     async def a_get_next_step(self) -> (str, None):
         return self.next_step
@@ -86,28 +86,27 @@ class Follower(dbdrivers.Follower, Common, db.Model):
             condition = condition and Message.text.like(text)
         await Message.delete.where(condition).gino.status()
 
-    async def a_get_values(self) -> Dict[str, str]:
+    async def a_get_values(self) -> dict:
         try:
             return json.loads(self.data)
         except JSONDecodeError:
-            logging.error("Cannot get values for follower %s %s - incorrect json", self.bot,
-                          self.chat)
+            logger.error("Cannot get values for follower %s %s - incorrect json", self.bot,
+                         self.chat)
 
-    async def a_get_value(self, name: str) -> str:
+    async def a_get_value(self, name: str, default=None):
         try:
             return json.loads(self.data)[name]
         except KeyError:
-            logging.warning("Value '%s' doesn't exist for follower %s %s", name, self.bot,
-                            self.chat)
+            return default
         except JSONDecodeError:
-            logging.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
-                          self.bot, self.chat)
+            logger.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
+                         self.bot, self.chat)
 
     async def a_set_value(self, name: str, value: str):
         try:
             data = json.loads(self.data)
         except JSONDecodeError:
-            logging.error("Incorrect json structure for follower %s %s", self.bot, self.chat)
+            logger.error("Incorrect json structure for follower %s %s", self.bot, self.chat)
             data = dict()
         data[name] = value
         await self.update(data=json.dumps(data)).apply()
@@ -117,8 +116,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
         try:
             del data[name]
         except KeyError:
-            logging.warning("Cannot delete value '%s' for follower %s %s - doesn't exist", name,
-                            self.bot, self.chat)
+            return
         await self.update(data=json.dumps(data)).apply()
 
     async def a_clear_values(self):
@@ -129,7 +127,7 @@ class Message(Common, db.Model):
     __tablename__ = "botovod_messages"
 
     follower_id = db.Column(db.Integer, db.ForeignKey(f"{Follower.__tablename__}.id"),
-                            nullable=False)    
+                            nullable=False)
     input = db.Column(db.Boolean, nullable=False)
     text = db.Column(db.Text)
     images = db.Column(db.Text, nullable=False, default="[]")

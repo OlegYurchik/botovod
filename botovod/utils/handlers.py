@@ -1,5 +1,6 @@
 from botovod.agents import Agent, Chat, Message
 from botovod.agents.telegram import TelegramAgent, TelegramCallback
+from botovod.dialogs import AsyncDialog, Dialog
 from botovod.utils.exceptions import NotPassed
 from functools import wraps
 import re
@@ -233,3 +234,15 @@ def only_telegram_callback(is_dialog: bool=False):
         return dialog_wrapper if is_dialog else func_wrapper
 
     return decorator
+
+
+def start_dialog(dialog_cls: Dialog, agent: Agent, chat: Chat, message: Message):
+    follower = agent.botovod.dbdriver.get_follower(agent, chat)
+    follower.set_dialog(dialog_cls.__name__)
+    return dialog_cls(agent, chat, message)
+
+
+async def start_async_dialog(dialog_cls: AsyncDialog, agent: Agent, chat: Chat, message: Message):
+    follower = await agent.botovod.dbdriver.a_get_follower(agent, chat)
+    await follower.a_set_dialog(dialog_cls.__name__)
+    return await dialog_cls(agent, chat, message)

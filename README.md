@@ -16,6 +16,8 @@ Contents
 * [Release Notes](#release-notes)
   * [0.1.4](#version-0-1-4)
   * [0.1.5](#version-0-1-5)
+  * [0.1.6](#version-0-1-6)
+  * [0.1.7](#version-0-1-7)
 * [Getting Started](#getting-started)
   * [Installation from Pip](#installation-from-pip)
   * [Installation from GitHub](#installation-from-github)
@@ -69,6 +71,13 @@ Contents
 ### Version 0.1.5
 * Add new methods for telegram Agent
 * Add emoji
+### Version 0.1.6
+* Fix gino getting follower
+* Adding item assignments for Botovod objects
+### Version 0.1.7
+* Add new features for telegram agent
+* Add start_dialog and start_async_dialog functions
+* Fix gino driver bugs
 ## Getting Started
 ### Installation from Pip
 For installation botovod library from pip you should have pip with python (prefer python3.6 or

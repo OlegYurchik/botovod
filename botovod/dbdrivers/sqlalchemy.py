@@ -13,6 +13,7 @@ from typing import Any, Callable, Dict, Iterable
 
 
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 
 def add(one: bool=True):
@@ -136,29 +137,28 @@ class Follower(dbdrivers.Follower, Common, Base):
             messages = messages.filter(Message.text.like(text))
         return messages
 
-    def get_values(self) -> Dict[str, str]:
+    def get_values(self) -> dict:
         try:
             return json.loads(self.data)
         except JSONDecodeError:
-            logging.error("Cannot get values for follower %s %s - incorrect json", self.bot,
-                          self.chat)
+            logger.error("Cannot get values for follower %s %s - incorrect json", self.bot,
+                         self.chat)
 
-    def get_value(self, name: str) -> str:
+    def get_value(self, name: str, default=None):
         try:
             return json.loads(self.data)[name]
         except KeyError:
-            logging.warning("Value '%s' doesn't exist for follower %s %s", name, self.bot,
-                            self.chat)
+            return default
         except JSONDecodeError:
-            logging.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
-                          self.bot, self.chat)
+            logger.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
+                         self.bot, self.chat)
 
     @add()
-    def set_value(self, name: str, value: str):
+    def set_value(self, name: str, value):
         try:
             data = json.loads(self.data)
         except JSONDecodeError:
-            logging.error("Incorrect json structure for follower %s %s", self.bot, self.chat)
+            logger.error("Incorrect json structure for follower %s %s", self.bot, self.chat)
             data = dict()
         data[name] = value
         self.data = json.dumps(data)
@@ -170,8 +170,7 @@ class Follower(dbdrivers.Follower, Common, Base):
         try:
             del data[name]
         except KeyError:
-            logging.warning("Cannot delete value '%s' for follower %s %s - doesn't exist", name,
-                            self.bot, self.chat)
+            pass
         self.data = json.dumps(data)
         return self
 

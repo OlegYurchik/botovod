@@ -21,7 +21,7 @@ class Agent:
     def listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
         from botovod.utils.exceptions import NotPassed
 
-        self.logger.info("[%s:%s] Get updates.", self, self.name)
+        self.logger.debug("[%s:%s] Get request.", self, self.name)
 
         messages = self.parser(headers, body)
         for chat, message in messages:
