@@ -25,9 +25,15 @@ class Agent:
 
         messages = self.parser(headers, body)
         for chat, message in messages:
+            if self.botovod.dbdriver is not None:
+                follower = self.botovod.dbdriver.get_follower(self, chat)
+                if follower is None:
+                    follower = self.botovod.dbdriver.add_follower(self, chat)
+            else:
+                follower = None
             for handler in self.botovod.handlers:
                 try:
-                    handler(self, chat, message)
+                    handler(self, chat, message, follower)
                 except NotPassed:
                     continue
                 break
@@ -40,9 +46,15 @@ class Agent:
 
         messages = await self.a_parser(headers, body)
         for chat, message in messages:
+            if self.botovod.dbdriver is not None:
+                follower = await self.botovod.dbdriver.a_get_follower(self, chat)
+                if follower is None:
+                    follower = await self.botovod.dbdriver.a_add_follower(self, chat)
+            else:
+                follower = None
             for handler in self.botovod.handlers:
                 try:
-                    await handler(self, chat, message)
+                    await handler(self, chat, message, follower)
                 except NotPassed:
                     continue
                 break
@@ -92,6 +104,7 @@ class Chat:
         self.agent = agent
         self.id = id
         self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
+
 
 class Message:
     def __init__(self, text: (str, None)=None, images: Iterator[Attachment]=[],

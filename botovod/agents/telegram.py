@@ -524,10 +524,18 @@ class TelegramAgent(Agent):
                               response.status, await response.text())
         return await TelegramAttachment.a_parse((await response.json())["result"], agent=self)
 
-    def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str, html: bool=False,
-                          markdown: bool=False):
+    def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
+                          keyboard: (TelegramInlineKeyboard, None)=None, html: bool=False,
+                          markdown: bool=False, web_preview: bool=True):
         url = self.BASE_URL.format(token=self.token, method="editMessageText")
-        data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
+        data = {
+            "chat_id": chat.id,
+            "message_id": message.raw["id"],
+            "text": text,
+            "disable_web_page_preview": not web_preview,
+        }
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
         if html:
             data["parse_mode"] = "HTML"
         elif markdown:
@@ -538,9 +546,17 @@ class TelegramAgent(Agent):
                               self.name, response.status_code, response.text)
 
     async def a_edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
-                                  html: bool=False, markdown: bool=False):
+                                  keyboard: (TelegramInlineKeyboard, None)=None, html: bool=False,
+                                  markdown: bool=False, web_preview: bool=True):
         url = self.BASE_URL.format(token=self.token, method="editMessageText")
-        data = {"chat_id": chat.id, "message_id": message.raw["id"], "text": text}
+        data = {
+            "chat_id": chat.id,
+            "message_id": message.raw["id"],
+            "text": text,
+            "disable_web_page_preview": not web_preview,
+        }
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
         if html:
             data["parse_mode"] = "HTML"
         elif markdown:
@@ -551,19 +567,310 @@ class TelegramAgent(Agent):
             self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
                               self.name, response.status, await response.text())
 
+    def edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
+                             keyboard: (TelegramInlineKeyboard, None)=None, html: bool=False,
+                             markdown: bool=False):
+        url = self.BASE_URL.format(token=self.token, method="editMessageCaption")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"], "caption": caption}
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
+        if html:
+            data["parse_mode"] = "HTML"
+        elif markdown:
+            data["parse_mode"] = "Markdown"
+        response = requests.post(url, data=data)
+        if response.status_code != 200:
+            self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
+                              self.name, response.status_code, response.text)
+
+    async def a_edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
+                                     keyboard: (TelegramInlineKeyboard, None)=None,
+                                     html: bool=False, markdown: bool=False):
+        url = self.BASE_URL.format(token=self.token, method="editMessageCaption")
+        data = {"chat_id": chat.id, "message_id": message.raw["id"], "caption": caption}
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
+        if html:
+            data["parse_mode"] = "HTML"
+        elif markdown:
+            data["parse_mode"] = "Markdown"
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
+        if response.status != 200:
+            self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
+
+    def edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment,
+                           type: str, caption: (str, None)=None, markdown: bool=False,
+                           html: bool=False, keyboard: (TelegramInlineKeyboard, None)=None, **raw):
+        url = self.BASE_URL.format(token=self.token, method="editMessageMedia")
+        media_data = {"type": type}
+        data = {"chat_id": chat.id, "message_id": message.id}
+        if "id" in media.raw:
+            media_data["media"] = media.raw["id"]
+        elif media.url is not None:
+            media_data["media"] = media.url
+            response = requests.post(url, data=data)
+        elif media.filepath is not None:
+            media_data["media"] = open(media.filepath)
+        else:
+            return
+        if caption is not None:
+            media_data["caption"] = caption
+        if markdown:
+            media_data["parse_mode"] = "Markdown"
+        elif html:
+            media_data["parse_mode"] = "HTML"
+        media_data.update(raw)
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
+        data["media"] = json.dumps(media_data)
+        response = requests.post(url=url, data=data)
+        if response.status_code != 200:
+            self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
+                              self.name, response.status_code, response.text)
+
+    async def a_edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment,
+                                   type: str, caption: (str, None)=None, markdown: bool=False,
+                                   html: bool=False, keyboard: (TelegramInlineKeyboard, None)=None,
+                                   **raw):
+        url = self.BASE_URL.format(token=self.token, method="editMessageMedia")
+        media_data = {"type": type}
+        data = {"chat_id": chat.id, "message_id": message.id}
+        if "id" in media.raw:
+            media_data["media"] = media.raw["id"]
+        elif media.url is not None:
+            media_data["media"] = media.url
+            response = requests.post(url, data=data)
+        elif media.filepath is not None:
+            media_data["media"] = open(media.filepath)
+        else:
+            return
+        if caption is not None:
+            media_data["caption"] = caption
+        if markdown:
+            media_data["parse_mode"] = "Markdown"
+        elif html:
+            media_data["parse_mode"] = "HTML"
+        media_data.update(raw)
+        if keyboard is not None:
+            data["reply_markup"] = keyboard.render()
+        data["media"] = json.dumps(media_data)
+        async with aiohttp.ClientSession() as session:
+            response = await session.post(url, data=data)
+        if response.status != 200:
+            self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
+
+    def edit_message_image(self, chat: Chat, message: TelegramMessage, image: Attachment,
+                           caption: (str, None)=None, markdown: bool=False, html: bool=False,
+                           keyboard: (TelegramInlineKeyboard, None)=None):
+        return self.edit_message_media(chat=chat, message=message, media=image, type="photo",
+                                       caption=caption, markdown=markdown, html=html,
+                                       keyboard=keyboard)
+
+    async def a_edit_message_image(self, chat: Chat, message: TelegramMessage, image: Attachment,
+                                   caption: (str, None)=None, markdown: bool=False,
+                                   html: bool=False, keyboard: (TelegramInlineKeyboard, None)=None):
+        return await self.a_edit_message_media(chat=chat, message=message, media=image,
+                                               type="photo", caption=caption, markdown=markdown,
+                                               html=html, keyboard=keyboard)
+
+    def edit_message_video(self, chat: Chat, message: TelegramMessage, video: Attachment,
+                           thumb: (Attachment, None)=None, caption: (str, None)=None,
+                           markdown: bool=False, html: bool=False, width: (int, None)=None,
+                           height: (int, None)=None, duration: (int, None)=None,
+                           supports_streaming: (bool, None)=None,
+                           keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if width is not None:
+            data["width"] = width
+        if height is not None:
+            data["height"] = height
+        if duration is not None:
+            data["duration"] = duration
+        if supports_streaming is not None:
+            data["supports_streaming"] = supports_streaming
+        return self.edit_message_media(chat=chat, message=message, media=video, type="video",
+                                       caption=caption, markdown=markdown, html=html,
+                                       keyboard=keyboard, **data)
+
+    async def a_edit_message_video(self, chat: Chat, message: TelegramMessage, video: Attachment,
+                                   thumb: (Attachment, None)=None, caption: (str, None)=None,
+                                   markdown: bool=False, html: bool=False, width: (int, None)=None,
+                                   height: (int, None)=None, duration: (int, None)=None,
+                                   supports_streaming: (bool, None)=None,
+                                   keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if width is not None:
+            data["width"] = width
+        if height is not None:
+            data["height"] = height
+        if duration is not None:
+            data["duration"] = duration
+        if supports_streaming is not None:
+            data["supports_streaming"] = supports_streaming
+        return await self.a_edit_message_media(chat=chat, message=message, media=video,
+                                               type="video", caption=caption, markdown=markdown,
+                                               html=html, keyboard=keyboard, **data)
+
+    def edit_message_animation(self, chat: Chat, message: TelegramMessage, animation: Attachment,
+                               thumb: (Attachment, None)=None, caption: (str, None)=None,
+                               markdown: bool=False, html: bool=False, width: (int, None)=None,
+                               height: (int, None)=None, duration: (int, None)=None,
+                               keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if width is not None:
+            data["width"] = width
+        if height is not None:
+            data["height"] = height
+        if duration is not None:
+            data["duration"] = duration
+        return self.edit_message_media(chat=chat, message=message, media=animation,
+                                       type="animation", caption=caption, markdown=markdown,
+                                       html=html, keyboard=keyboard, **data)
+
+    async def a_edit_message_animation(self, chat: Chat, message: TelegramMessage,
+                                       animation: Attachment, thumb: (Attachment, None)=None,
+                                       caption: (str, None)=None, markdown: bool=False,
+                                       html: bool=False, width: (int, None)=None,
+                                       height: (int, None)=None, duration: (int, None)=None,
+                                       keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if width is not None:
+            data["width"] = width
+        if height is not None:
+            data["height"] = height
+        if duration is not None:
+            data["duration"] = duration
+        return await self.a_edit_message_media(chat=chat, message=message, media=animation,
+                                               type="animation", caption=caption, markdown=markdown,
+                                               html=html, keyboard=keyboard, **data)
+
+    def edit_message_audio(self, chat: Chat, message: TelegramMessage, audio: Attachment,
+                           thumb: (Attachment, None)=None, caption: (str, None)=None,
+                           markdown: bool=False, html: bool=False, duration: (int, None)=None,
+                           performer: (str, None)=None, title: (str, None)=None,
+                           keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if duration is not None:
+            data["duration"] = duration
+        if performer is not None:
+            data["performer"] = performer
+        if title is not None:
+            data["title"] = title
+        return self.edit_message_media(chat=chat, message=message, media=audio, type="audio",
+                                       caption=caption, markdown=markdown, html=html,
+                                       keyboard=keyboard, **data)
+
+    async def a_edit_message_audio(self, chat: Chat, message: TelegramMessage,
+                                   audio: Attachment, thumb: (Attachment, None)=None,
+                                   caption: (str, None)=None, markdown: bool=False,
+                                   html: bool=False, duration: (int, None)=None,
+                                   performer: (str, None)=None, title: (str, None)=None,
+                                   keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        if duration is not None:
+            data["duration"] = duration
+        if performer is not None:
+            data["performer"] = performer
+        if title is not None:
+            data["title"] = title
+        return await self.a_edit_message_media(chat=chat, message=message, media=video,
+                                               type="audio", caption=caption, markdown=markdown,
+                                               html=html, keyboard=keyboard, **data)
+
+    def edit_message_document(self, chat: Chat, message: TelegramMessage, document: Attachment,
+                              thumb: (Attachment, None)=None, caption: (str, None)=None,
+                              markdown: bool=False, html: bool=False,
+                              keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        return self.edit_message_media(chat=chat, message=message, media=document, type="document",
+                                       caption=caption, markdown=markdown, html=html,
+                                       keyboard=keyboard, **data)
+
+    async def a_edit_message_document(self, chat: Chat, message: TelegramMessage,
+                                      document: Attachment, thumb: (Attachment, None)=None,
+                                      caption: (str, None)=None, markdown: bool=False,
+                                      html: bool=False,
+                                      keyboard: (TelegramInlineKeyboard, None)=None):
+        data = {}
+        if thumb is not None:
+            if "id" in attachment.raw:
+                data["thumb"] = attachment.raw["id"]
+            elif attachment.url is not None:
+                data["thumb"] = attachment.url
+                response = requests.post(url, data=data)
+            elif attachment.filepath is not None:
+                data["thumb"] = open(attachment.filepath)
+        return await self.a_edit_message_media(chat=chat, message=message, media=document,
+                                               type="document", caption=caption, markdown=markdown,
+                                               html=html, keyboard=keyboard, **data)
+
     def edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
-                              keyboard: TelegramInlineKeyboard, html: bool=False,
-                              markdown: bool=False):
+                              keyboard: TelegramInlineKeyboard):
         url = self.BASE_URL.format(token=self.token, method="editMessageReplyMarkup")
         data = {
             "chat_id": chat.id,
             "message_id": message.raw["id"],
             "reply_markup": keyboard.render(),
         }
-        if html:
-            data["parse_mode"] = "HTML"
-        elif markdown:
-            data["parse_mode"] = "Markdown"
         response = requests.post(url, data=data)
         if response.status_code != 200:
             self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,

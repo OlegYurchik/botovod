@@ -18,6 +18,7 @@ Contents
   * [0.1.5](#version-0-1-5)
   * [0.1.6](#version-0-1-6)
   * [0.1.7](#version-0-1-7)
+  * [0.1.8](#version-0-1-8)
 * [Getting Started](#getting-started)
   * [Installation from Pip](#installation-from-pip)
   * [Installation from GitHub](#installation-from-github)
@@ -78,6 +79,10 @@ Contents
 * Add new features for telegram agent
 * Add start_dialog and start_async_dialog functions
 * Fix gino driver bugs
+### Version 0.1.8
+* Fix utils handlers
+* Add new methods for telegram
+* Optimize interaction with DB
 ## Getting Started
 ### Installation from Pip
 For installation botovod library from pip you should have pip with python (prefer python3.6 or

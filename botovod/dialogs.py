@@ -1,6 +1,7 @@
 import json
 from botovod.agents import Agent, Attachment, Chat, Keyboard, Location, Message
 from botovod.agents.telegram import TelegramAgent, TelegramCallback
+from botovod.dbdrivers import Follower
 from botovod.utils.exceptions import NotPassed
 import logging
 from typing import Any, Callable, Iterator
@@ -10,17 +11,15 @@ logger = logging.getLogger(__name__)
 
 
 class Dialog:
-    def __init__(self, agent: Agent, chat: Chat, message: Message):
+    def __init__(self, agent: Agent, chat: Chat, message: Message, follower: Follower):
         self.agent = agent
         self.chat = chat
         self.message = message
-        self.follower = agent.botovod.dbdriver.get_follower(agent, chat)
-        if self.follower is None:
-            self.follower = agent.botovod.dbdriver.add_follower(agent, chat)
+        self.follower = follower
 
-    def __new__(cls, agent: Agent, chat: Chat, message: Message):
+    def __new__(cls, agent: Agent, chat: Chat, message: Message, follower: Follower):
         dialog = super().__new__(cls)
-        dialog.__init__(agent, chat, message)
+        dialog.__init__(agent=agent, chat=chat, message=message, follower=follower)
 
         dialog_name = dialog.follower.get_dialog()
         if dialog_name is not None and dialog_name != cls.__name__:
@@ -53,24 +52,22 @@ class Dialog:
 
     def start_dialog(self, dialog_class: Callable):
         self.follower.set_dialog(dialog_class.__name__)
-        dialog_class(self.agent, self.chat, self.message)
+        dialog_class(self.agent, self.chat, self.message, self.follower)
 
     def start(self):
         raise NotImplementedError
 
 
 class AsyncDialog:
-    async def __init__(self, agent: Agent, chat: Chat, message: Message):
+    async def __init__(self, agent: Agent, chat: Chat, message: Message, follower: Follower):
         self.agent = agent
         self.chat = chat
         self.message = message
-        self.follower = await agent.botovod.dbdriver.a_get_follower(agent, chat)
-        if self.follower is None:
-            self.follower = await agent.botovod.dbdriver.a_add_follower(agent, chat)
+        self.follower = follower
 
-    async def __new__(cls, agent: Agent, chat: Chat, message: Message):
+    async def __new__(cls, agent: Agent, chat: Chat, message: Message, follower: Follower):
         dialog = super().__new__(cls)
-        await dialog.__init__(agent, chat, message)
+        await dialog.__init__(agent=agent, chat=chat, message=message, follower=follower)
 
         dialog_name = await dialog.follower.a_get_dialog()
         if dialog_name is not None and dialog_name != cls.__name__:
@@ -105,7 +102,7 @@ class AsyncDialog:
 
     async def start_dialog(self, dialog_class: Callable):
         await self.follower.a_set_dialog(dialog_class.__name__)
-        await dialog_class(self.agent, self.chat, self.message)
+        await dialog_class(self.agent, self.chat, self.message, self.follower)
 
     async def start(self):
         raise NotImplementedError
