@@ -5,7 +5,7 @@ import gino
 import json
 from json import JSONDecodeError
 import logging
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional, Union
 
 
 db = gino.Gino()
@@ -28,23 +28,29 @@ class Follower(dbdrivers.Follower, Common, db.Model):
     data = db.Column(db.Text, nullable=False, default="{}")
 
     async def a_get_chat(self) -> Chat:
+
         return Chat(self.bot, self.chat)
 
-    async def a_get_dialog(self) -> (str, None):
+    async def a_get_dialog(self) -> Optional[str]:
+
         return self.dialog
 
-    async def a_set_dialog(self, name: (str, None)=None):
+    async def a_set_dialog(self, name: Optional[str]=None):
+
         await self.update(dialog=name, next_step=None if name is None else "start").apply()
 
-    async def a_get_next_step(self) -> (str, None):
+    async def a_get_next_step(self) -> Optional[str]:
+
         return self.next_step
     
-    async def a_set_next_step(self, next_step: (str, None)=None):
+    async def a_set_next_step(self, next_step: Optional[str]=None):
+
         await self.update(next_step=next_step).apply()
 
-    async def a_get_history(self, after_date: (datetime, None)=None,
-                            before_date: (datetime, None)=None, input: (bool, None)=None,
-                            text: (str, None)=None) -> Iterable[BotoMessage]:
+    async def a_get_history(self, after_date: Optional[datetime]=None,
+                            before_date: Optional[datetime]=None, input: Optional[bool]=None,
+                            text: Optional[str]=None) -> Iterable[BotoMessage]:
+
         condition = Message.follower_id == self.id
         if after_date is not None:
             condition = condition and Message.date >= after_date
@@ -56,10 +62,14 @@ class Follower(dbdrivers.Follower, Common, db.Model):
             condition = condition and Message.text.like(text)
         return [message.to_object() for message in await Message.query.where(condition).gino.all()]
 
-    async def a_add_history(self, datetime: datetime, text: (str, None)=None,
-                            images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
-                            videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
-                            locations: Iterable[Location]=[], raw: dict={}, input: bool=True):
+    async def a_add_history(self, datetime: datetime, text: Optional[str]=None,
+                            images: Iterable[Attachment]=(), audios: Iterable[Attachment]=(),
+                            videos: Iterable[Attachment]=(), documents: Iterable[Attachment]=(),
+                            locations: Iterable[Location]=(), raw: Optional[dict]=None,
+                            input: bool=True):
+
+        if not raw:
+            raw = {}
         await Message.create(
             follower_id=self.id,
             input=input,
@@ -73,8 +83,9 @@ class Follower(dbdrivers.Follower, Common, db.Model):
             datetime=datetime,
         )
 
-    async def a_clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
-                              input: (datetime, None)=None, text: (str, None)=None):
+    async def a_clear_history(self, after: Optional[datetime]=None, before: Optional[datetime]=None,
+                              input: Optional[datetime]=None, text: Optional[str]=None):
+
         condition = Message.follower_id == self.id
         if not after is None:
             condition = condition and Message.datetime >= after
@@ -87,6 +98,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
         await Message.delete.where(condition).gino.status()
 
     async def a_get_values(self) -> dict:
+
         try:
             return json.loads(self.data)
         except JSONDecodeError:
@@ -94,6 +106,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
                          self.chat)
 
     async def a_get_value(self, name: str, default=None):
+
         try:
             return json.loads(self.data)[name]
         except KeyError:
@@ -103,6 +116,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
                          self.bot, self.chat)
 
     async def a_set_value(self, name: str, value: str):
+
         try:
             data = json.loads(self.data)
         except JSONDecodeError:
@@ -112,6 +126,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
         await self.update(data=json.dumps(data)).apply()
 
     async def a_delete_value(self, name: str):
+
         data = json.loads(self.data)
         try:
             del data[name]
@@ -120,6 +135,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
         await self.update(data=json.dumps(data)).apply()
 
     async def a_clear_values(self):
+
         await self.update(data="{}").apply()
 
 
@@ -140,12 +156,14 @@ class Message(Common, db.Model):
 
     @staticmethod
     def parser(cls, data: dict):
+
         obj = cls()
         for key, value in data.items():
             obj.__setattr__(key, value)
         return obj
 
     def to_object(self):
+
         message = BotoMessage()
         message.text = self.text
         message.images = [self.parser(Attachment, image) for image in json.loads(self.images)]
@@ -161,36 +179,49 @@ class Message(Common, db.Model):
 
 
 class DBDriver(dbdrivers.DBDriver):
-    db = db
-
     @classmethod
-    async def a_connect(cls, engine: str, database: str, host: (str, int, None)=None,
-                        username: (str, None)=None, password: (str, None)=None):
-        try:
-            await cls.db.pop_bind().close()
-        except gino.exceptions.UninitializedError:
-            pass
+    async def __ainit__(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+                        username: Optional[str]=None, password: Optional[str]=None):
+
+        dbdriver = cls()
         dsn = f"{engine}://"
         if username is not None and password is not None:
             dsn += f"{username}:{password}@"
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        await cls.db.set_bind(dsn)
-        await cls.db.gino.create_all()
+        dbdriver.engine = await gino.create_engine(dsn)
+        await db.gino.create_all(dbdriver.engine)
+
+        return dbdriver
 
     @classmethod
-    async def a_get_follower(cls, agent: Agent, chat: Chat) -> (Follower, None):
+    async def acreate(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+                      username: Optional[str]=None, password: Optional[str]=None):
+
+        return DBDriver.__ainit__(
+            engine=engine,
+            database=database,
+            host=host,
+            username=username,
+            password=password,
+        )
+
+    @classmethod
+    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Optional[Follower]:
+
         return await Follower.query.where(Follower.bot == agent.__class__.__name__).where(
             Follower.chat == chat.id
         ).gino.first()
 
     @classmethod
     async def a_add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+
         return await Follower.create(bot=agent.__class__.__name__, chat=chat.id)
 
     @classmethod
     async def a_delete_follower(cls, agent: Agent, chat: Chat):
+
         await Follower.delete.where(Follower.bot == agent.__class__.__name__).where(
             Follower.chat == chat.id
         ).gino.status()

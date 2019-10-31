@@ -1,2 +1,0 @@
-class NotPassed(Exception):
-    pass

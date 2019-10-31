@@ -9,7 +9,7 @@ from sqlalchemy import Column, ForeignKey, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.types import Boolean, Date, Integer, DateTime, String, Text
-from typing import Any, Callable, Dict, Iterable
+from typing import Any, Callable, Dict, Iterable, Optional, Union
 
 
 Base = declarative_base()
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 def add(one: bool=True):
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
+
             result = func(*args, **kwargs)
             if result is not None:
                 if one:
@@ -34,6 +35,7 @@ def add(one: bool=True):
 def delete(one: bool=True):
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
+
             result = func(*args, **kwargs)
             if result is not None:
                 if one:
@@ -41,18 +43,24 @@ def delete(one: bool=True):
                 else:
                     DBDriver.session.delete_all(result)
             DBDriver.session.commit()
+
             return result
+
         return wrapper
+
     return decorator
 
 
 def update():
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
+
             result = func(*args, **kwargs)
             DBDriver.session.commit()
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -73,27 +81,33 @@ class Follower(dbdrivers.Follower, Common, Base):
     messages = relationship("Message", back_populates="follower", uselist=True)
 
     def get_chat(self) -> Chat:
+
         return Chat(self.bot, self.chat)
 
-    def get_dialog(self) -> (str, None):
+    def get_dialog(self) -> Optional[str]:
+
         return self.dialog
 
     @add()
-    def set_dialog(self, name: (str, None)=None):
+    def set_dialog(self, name: Optional[str]=None):
+
         self.dialog = name
         self.set_next_step(None if name is None else "start")
         return self
 
-    def get_next_step(self) -> (str, None):
+    def get_next_step(self) -> Optional[str]:
+
         return self.next_step
 
     @add()
-    def set_next_step(self, next_step: (str, None)=None):
+    def set_next_step(self, next_step: Optional[str]=None):
+
         self.next_step = next_step
         return self
 
-    def get_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
-                    input: (bool, None)=None, text: (str, None)=None) -> Iterable[BotoMessage]:
+    def get_history(self, after: Optional[datetime]=None, before: Optional[datetime]=None,
+                    input: Optional[bool]=None, text: Optional[str]=None) -> Iterable[BotoMessage]:
+
         messages = self.messages
         if after is not None:
             messages = messages.filter(Message.datetime >= after)
@@ -106,10 +120,11 @@ class Follower(dbdrivers.Follower, Common, Base):
         return [message.to_object() for message in messages.all()]
 
     @add()
-    def add_history(self, datetime: datetime, text: (str, None)=None,
-                    images: Iterable[Attachment]=[], audios: Iterable[Attachment]=[],
-                    videos: Iterable[Attachment]=[], documents: Iterable[Attachment]=[],
-                    locations: Iterable[Location]=[], input: bool=True, **raw):
+    def add_history(self, datetime: datetime, text: Optional[str]=None,
+                    images: Iterable[Attachment]=(), audios: Iterable[Attachment]=(),
+                    videos: Iterable[Attachment]=(), documents: Iterable[Attachment]=(),
+                    locations: Iterable[Location]=(), input: bool=True, **raw):
+
         return Message(
             follower_id=self.id,
             input=input,
@@ -124,8 +139,9 @@ class Follower(dbdrivers.Follower, Common, Base):
         )
 
     @delete(one=False)
-    def clear_history(self, after: (datetime, None)=None, before: (datetime, None)=None,
-                      input: (bool, None)=None, text: (str, None)=None):
+    def clear_history(self, after: Optional[datetime]=None, before: Optional[datetime]=None,
+                      input: Optional[bool]=None, text: Optional[str]=None):
+
         messages = self.messages
         if not after is None:
             messages = messages.filter(Message.datetime >= after)
@@ -138,6 +154,7 @@ class Follower(dbdrivers.Follower, Common, Base):
         return messages
 
     def get_values(self) -> dict:
+
         try:
             return json.loads(self.data)
         except JSONDecodeError:
@@ -145,6 +162,7 @@ class Follower(dbdrivers.Follower, Common, Base):
                          self.chat)
 
     def get_value(self, name: str, default=None):
+
         try:
             return json.loads(self.data)[name]
         except KeyError:
@@ -155,6 +173,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
     @add()
     def set_value(self, name: str, value):
+
         try:
             data = json.loads(self.data)
         except JSONDecodeError:
@@ -166,6 +185,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
     @update()
     def delete_value(self, name: str):
+
         data = json.loads(self.data)
         try:
             del data[name]
@@ -196,12 +216,14 @@ class Message(Common, Base):
 
     @staticmethod
     def parser(cls, data: dict):
+
         obj = cls()
         for key, value in data.items():
             obj.__setattr__(key, value)
         return obj
 
     def to_object(self):
+
         message = BotoMessage()
         message.text = self.text
         message.images = [self.parser(Attachment, image) for image in json.loads(self.images)]
@@ -218,36 +240,36 @@ class Message(Common, Base):
 
 
 class DBDriver(dbdrivers.DBDriver):
-    @classmethod
-    def connect(cls, engine: str, database: str, host: (str, int, None)=None,
-                username: (str, None)=None, password: (str, None)=None, debug: bool=False):
+    def __init__(self, engine: str, database: str, host: Optional[Union[str, int]]=None,
+                 username: Optional[str]=None, password: Optional[str]=None, debug: bool=False):
+
         dsn = f"{engine}://"
         if username is not None and password is not None:
             dsn += f"{username}:{password}@"
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        cls.engine = create_engine(dsn, echo=debug)
-        cls.metadata = Base.metadata
-        cls.metadata.create_all(cls.engine)
+        self.engine = create_engine(dsn, echo=debug)
+        self.metadata = Base.metadata
+        self.metadata.create_all(self.engine)
         Session = sessionmaker()
-        Session.configure(bind=cls.engine)
-        cls.session = Session()
+        Session.configure(bind=self.engine)
+        self.session = Session()
 
-    @classmethod
-    def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
-        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
+    def get_follower(self, agent: Agent, chat: Chat) -> Follower:
+
+        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
         return follower.filter(Follower.chat == chat.id).first()
 
-    @classmethod
     @add()
-    def add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    def add_follower(self, agent: Agent, chat: Chat) -> Follower:
+
         follower = Follower(chat=chat.id, bot=agent.name)
         return follower
 
-    @classmethod
     @delete()
-    def delete_follower(cls, agent: Agent, chat: Chat):
-        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
+    def delete_follower(self, agent: Agent, chat: Chat):
+
+        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
         follower = follower.filter(Follower.chat == chat.id)
         return follower

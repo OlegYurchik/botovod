@@ -7,4 +7,3 @@ deploy/dist
 deploy/pylint.log
 test.py
 venv
-
