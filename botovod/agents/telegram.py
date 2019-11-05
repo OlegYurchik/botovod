@@ -1,9 +1,11 @@
+from __future__ import annotations
 from .agents import Agent, Attachment, Chat, Keyboard, KeyboardButton, Location, Message
 import aiofiles
 import aiohttp
 import asyncio
 from datetime import datetime
 import json
+import io
 import logging
 import requests
 from threading import Thread
@@ -22,7 +24,7 @@ class TelegramAgent(Agent):
                  webhook_url: Optional[str]=None, certificate_path: Optional[str]=None,
                  logger: Optional[logging.Logger]=None):
 
-        super().__init__(logger)
+        super().__init__(logger=logger)
         self.token = token
         self.method = method
 
@@ -57,7 +59,7 @@ class TelegramAgent(Agent):
         if self.logger:
             self.logger.info(log_message, self, self.name)
 
-    async def astart(self):
+    async def a_start(self):
 
         if self.logger:
             self.logger.info("[%s:%s] Starting agent...", self, self.name)
@@ -66,7 +68,7 @@ class TelegramAgent(Agent):
         self.running = True
 
         if self.method == self.POLLING:
-            asyncio.create_task(self.apolling())
+            asyncio.create_task(self.a_polling())
             log_message = "[%s:%s] Started by polling."
         elif self.method == self.WEBHOOK:
             log_message = "[%s:%s] Started by webhook."
@@ -87,7 +89,7 @@ class TelegramAgent(Agent):
         if self.logger:
             self.logger.info("[%s:%s] Agent stopped.", self, self.name)
 
-    async def astop(self):
+    async def a_stop(self):
 
         if self.logger:
             self.logger.info("[%s:%s] Stopping agent...", self, self.name)
@@ -122,7 +124,7 @@ class TelegramAgent(Agent):
 
         return messages
 
-    async def aparser(self, headers: Dict[str, str],
+    async def a_parser(self, headers: Dict[str, str],
                        body: str) -> List[Tuple[Chat, TelegramAgent]]:
 
         update = json.loads(body)
@@ -151,7 +153,7 @@ class TelegramAgent(Agent):
     def responser(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
         return 200, {}, ""
 
-    async def aresponser(self, headers: Dict[str, str],
+    async def a_responser(self, headers: Dict[str, str],
                           body: str) -> Tuple[int, Dict[str, str], str]:
         return self.responser(headers=headers, body=body)
 
@@ -173,7 +175,7 @@ class TelegramAgent(Agent):
             finally:
                 time.sleep(self.delay)
 
-    async def apolling(self):
+    async def a_polling(self):
 
         url = self.BASE_URL.format(token=self.token, method="getUpdates")
         while self.running:
@@ -183,7 +185,7 @@ class TelegramAgent(Agent):
                     response = await session.get(url, params=params)
                 updates = (await response.json())["result"]
                 for update in updates:
-                    await self.alisten(dict(response.headers), json.dumps(update))
+                    await self.a_listen(dict(response.headers), json.dumps(update))
             except Exception:
                 if self.logger:
                     self.logger.exception("[%s:%s] Got exception")
@@ -192,72 +194,10 @@ class TelegramAgent(Agent):
             finally:
                 await asyncio.sleep(self.delay)
 
-    def send_attachment(self, type: str, chat: Chat, attachment: Attachment,
-                        keyboard: Optional[Keyboard]=None, remove_keyboard: bool=False):
-
-        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
-
-        data = {"chat_id": chat.id}
-        if "id" in attachment.raw:
-            data[type] = attachment.raw["id"]
-        elif attachment.url is not None:
-            data[type] = attachment.url
-            response = requests.post(url, data=data)
-        elif attachment.filepath is not None:
-            data[type] = open(attachment.filepath)
-        else:
-            return
-
-        if keyboard is not None:
-            if hasattr(keyboard, "render"):
-                data["reply_markup"] = keyboard.render()
-            else:
-                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
-        elif remove_keyboard:
-            data["reply_markup"] = '{"remove_keyboard": true}'
-
-        response = requests.post(url, data=data)
-        if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot send photo! Code: %s; Body: %s", self, self.name,
-                              response.status_code, response.text)
-        else:
-            return TelegramMessage.parse(response.json()["result"])
-
-    async def a_send_attachment(self, type: str, chat: Chat, attachment: Attachment,
-                                keyboard: Optional[Keyboard]=None, remove_keyboard: bool=False):
-
-        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
-
-        data = {"chat_id": chat.id}
-        if "id" in attachment.raw:
-            data[type] = attachment.raw["id"]
-        elif attachment.url is not None:
-            data[type] = attachment.url
-            response = requests.post(url, data=data)
-        elif attachment.filepath is not None:
-            data[type] = open(attachment.filepath)
-        else:
-            return
-
-        if keyboard is not None:
-            if hasattr(keyboard, "render"):
-                data["reply_markup"] = keyboard.render()
-            else:
-                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
-        elif remove_keyboard:
-            data["reply_markup"] = '{"remove_keyboard": true}'
-
-        async with aiohttp.ClientSession() as session:
-            response = await session.post( url, data=data)
-        if response.status != 200:
-            self.logger.error("[%s:%s] Cannot send photo! Code: %s; Body: %s", self, self.name,
-                              response.status, await response.text())
-        else:
-            return await TelegramMessage.a_parse((await response.json())["result"])
-
     def set_webhook(self):
 
-        self.logger.info("[%s:%s] Setting webhook...", self, self.name)
+        if self.logger:
+            self.logger.info("[%s:%s] Setting webhook...", self, self.name)
 
         url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
@@ -273,15 +213,18 @@ class TelegramAgent(Agent):
         else:
             response = requests.post(url)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self, self.name,
-                              response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
             return
 
-        self.logger.info("[%s:%s] Set webhook.", self, self.name)
+        if self.logger:
+            self.logger.info("[%s:%s] Set webhook.", self, self.name)
 
     async def a_set_webhook(self):
 
-        self.logger.info("[%s:%s] Setting webhook...", self, self.name)
+        if self.logger:
+            self.logger.info("[%s:%s] Setting webhook...", self, self.name)
 
         url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
@@ -300,11 +243,14 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url)
         if response.status != 200:
-            self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self, self.name,
-                              response.status, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
+                                  self.name, response.status, response.text)
             return
 
-        self.logger.info("[%s:%s] Set webhook.", self, self.name)
+        if self.logger:
+            self.logger.info("[%s:%s] Set webhook.", self, self.name)
+            self.logger.info("RESPONSE: %s", await response.text())
 
     def send_message(self, chat: Chat, text: Optional[str]=None, images: Iterator[Attachment]=(),
                      audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
@@ -337,8 +283,9 @@ class TelegramAgent(Agent):
                 data["reply_to_message_id"] = reply.id
             response = requests.post(url, data=data)
             if response.status_code != 200:
-                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+                if self.logger:
+                    self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
+                                      self.name, response.status_code, response.text)
             else:
                 messages.append(TelegramMessage.parse(response.json()["result"]))
         for image in images:
@@ -401,8 +348,9 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url, data=data)
             if response.status != 200:
-                self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+                if self.logger:
+                    self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
+                                      self.name, response.status, await response.text())
             else:
                 messages.append(TelegramMessage.parse((await response.json())["result"]))
         for image in images:
@@ -431,6 +379,62 @@ class TelegramAgent(Agent):
             if message is not None:
                 messages.append(message)
         return messages
+
+    def send_attachment(self, type: str, chat: Chat, attachment: Attachment,
+                        keyboard: Optional[Keyboard]=None, remove_keyboard: bool=False):
+
+        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
+        attachment_data = TelegramAttachment.render(attachment)
+
+        data = {"chat_id": chat.id}
+        files = {}
+        if isinstance(attachment_data, io.IOBase):
+            files = {type: attachment_data}
+        else:
+            data[type] = attachment_data
+
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
+        elif remove_keyboard:
+            data["reply_markup"] = '{"remove_keyboard": true}'
+
+        response = requests.post(url, data=data, files=files)
+
+        if response.status_code != 200:
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name,
+                                  type, response.status_code, response.text)
+        else:
+            return TelegramMessage.parse(response.json()["result"])
+
+    async def a_send_attachment(self, type: str, chat: Chat, attachment: Attachment,
+                                keyboard: Optional[Keyboard]=None, remove_keyboard: bool=False):
+
+        url = self.BASE_URL.format(token=self.token, method="send" + type.capitalize())
+        attachment_data = await TelegramAttachment.a_render(attachment)
+
+        data = {"chat_id": chat.id, type: attachment_data}
+
+        if keyboard is not None:
+            if hasattr(keyboard, "render"):
+                data["reply_markup"] = keyboard.render()
+            else:
+                data["reply_markup"] = TelegramKeyboard.default_render(keyboard)
+        elif remove_keyboard:
+            data["reply_markup"] = '{"remove_keyboard": true}'
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=data) as response:
+                return response
+        if response.status != 200:
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name,
+                                  type, response.status, await response.text())
+        else:
+            return await TelegramMessage.a_parse((await response.json())["result"])
 
     def send_photo(self, chat: Chat, image: Attachment, keyboard: Optional[Keyboard]=None,
                    remove_keyboard: bool=False):
@@ -534,8 +538,9 @@ class TelegramAgent(Agent):
             data["reply_markup"] = '{"remove_keyboard": true}'
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
-                              response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
         else:
             return TelegramMessage.parse(response.json())
 
@@ -554,8 +559,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
-                              response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
         else:
             return await TelegramMessage.a_parse((await response.json())["result"])
 
@@ -564,8 +570,9 @@ class TelegramAgent(Agent):
         url = self.BASE_URL.format(token=self.token, method="getFile")
         response = requests.get(url, params={"file_id": file_id})
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
-                              response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
+                                  response.status_code, response.text)
         return TelegramAttachment.parse(response.json()["result"], agent=self)
 
     async def a_get_file(self, file_id: int):
@@ -574,8 +581,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.get(url, params={"file_id": file_id})
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
-                              response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
+                                  response.status, await response.text())
         return await TelegramAttachment.a_parse((await response.json())["result"], agent=self)
 
     def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
@@ -597,8 +605,9 @@ class TelegramAgent(Agent):
             data["parse_mode"] = "Markdown"
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
-                              self.name, response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
                                   keyboard: Optional[TelegramInlineKeyboard]=None, html: bool=False,
@@ -620,8 +629,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
-                              self.name, response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
 
     def edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
                              keyboard: Optional[TelegramInlineKeyboard]=None, html: bool=False,
@@ -637,8 +647,9 @@ class TelegramAgent(Agent):
             data["parse_mode"] = "Markdown"
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
-                              self.name, response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
                                      keyboard: Optional[TelegramInlineKeyboard]=None,
@@ -655,26 +666,31 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
-                              self.name, response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
 
-    def edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment,
-                           type: str, caption: Optional[str]=None, markdown: bool=False,
-                           html: bool=False, keyboard: Optional[TelegramInlineKeyboard]=None,
-                           **raw):
+    def edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment, type: str,
+                           thumb: Optional[Attachment]=None, caption: Optional[str]=None,
+                           markdown: bool=False, html: bool=False,
+                           keyboard: Optional[TelegramInlineKeyboard]=None, **raw):
 
         url = self.BASE_URL.format(token=self.token, method="editMessageMedia")
-        media_data = {"type": type}
+        attachment_data = TelegramAttachment.render(media)
+        thumb_data = TelegramAttachment(thumb) if thumb else None
+
         data = {"chat_id": chat.id, "message_id": message.id}
-        if "id" in media.raw:
-            media_data["media"] = media.raw["id"]
-        elif media.url is not None:
-            media_data["media"] = media.url
-            response = requests.post(url, data=data)
-        elif media.filepath is not None:
-            media_data["media"] = open(media.filepath)
+        media_data = {"type": type}
+        files = {}
+        if isinstance(attachment_data, io.IOBase):
+            files["media"] = attachment_data
         else:
-            return
+            media_data["media"] = attachment_data
+        if isinstance(attachment_data, io.IOBase):
+            files["thumb"] = thumb_data
+        else:
+            media_data["thumb"] = thumb_data
+
         if caption is not None:
             media_data["caption"] = caption
         if markdown:
@@ -685,43 +701,46 @@ class TelegramAgent(Agent):
         if keyboard is not None:
             data["reply_markup"] = keyboard.render()
         data["media"] = json.dumps(media_data)
-        response = requests.post(url=url, data=data)
+
+        response = requests.post(url=url, data=data, files=files)
+
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
-                              self.name, response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment,
-                                   type: str, caption: Optional[str]=None, markdown: bool=False,
+                                   type: str, thumb: Optional[Attachment]=None,
+                                   caption: Optional[str]=None, markdown: bool=False,
                                    html: bool=False,
                                    keyboard: Optional[TelegramInlineKeyboard]=None, **raw):
 
         url = self.BASE_URL.format(token=self.token, method="editMessageMedia")
-        media_data = {"type": type}
+        attachment_data = TelegramAttachment.a_render(media)
+        thumb_data = TelegramAttachment.a_render(thumb) if thumb else None
+
         data = {"chat_id": chat.id, "message_id": message.id}
-        if "id" in media.raw:
-            media_data["media"] = media.raw["id"]
-        elif media.url is not None:
-            media_data["media"] = media.url
-            response = requests.post(url, data=data)
-        elif media.filepath is not None:
-            media_data["media"] = open(media.filepath)
+        media_data = {"type": type, "media": attachment_data}
+        if isinstance(thumb_data, io.IOBase):
+            data["thumb"] = thumb_data
         else:
-            return
-        if caption is not None:
+            media_data["thumb"] = thumb_data
+        if caption:
             media_data["caption"] = caption
         if markdown:
             media_data["parse_mode"] = "Markdown"
         elif html:
             media_data["parse_mode"] = "HTML"
         media_data.update(raw)
-        if keyboard is not None:
+        if keyboard:
             data["reply_markup"] = keyboard.render()
         data["media"] = json.dumps(media_data)
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
-                              self.name, response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message %s! Code: %s; Body: %s", self,
+                                  self.name, type, response.status, await response.text())
 
     def edit_message_image(self, chat: Chat, message: TelegramMessage, image: Attachment,
                            caption: Optional[str]=None, markdown: bool=False, html: bool=False,
@@ -748,24 +767,16 @@ class TelegramAgent(Agent):
                            keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in video.raw:
-                data["thumb"] = video.raw["id"]
-            elif video.url is not None:
-                data["thumb"] = video.url
-                response = requests.post(url, data=data)
-            elif video.filepath is not None:
-                data["thumb"] = open(video.filepath)
-        if width is not None:
+        if width:
             data["width"] = width
-        if height is not None:
+        if height:
             data["height"] = height
-        if duration is not None:
+        if duration:
             data["duration"] = duration
-        if supports_streaming is not None:
+        if supports_streaming:
             data["supports_streaming"] = supports_streaming
         return self.edit_message_media(chat=chat, message=message, media=video, type="video",
-                                       caption=caption, markdown=markdown, html=html,
+                                       thumb=thumb, caption=caption, markdown=markdown, html=html,
                                        keyboard=keyboard, **data)
 
     async def a_edit_message_video(self, chat: Chat, message: TelegramMessage, video: Attachment,
@@ -777,25 +788,18 @@ class TelegramAgent(Agent):
                                    keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
-        if width is not None:
+        if width:
             data["width"] = width
-        if height is not None:
+        if height:
             data["height"] = height
-        if duration is not None:
+        if duration:
             data["duration"] = duration
-        if supports_streaming is not None:
+        if supports_streaming:
             data["supports_streaming"] = supports_streaming
         return await self.a_edit_message_media(chat=chat, message=message, media=video,
-                                               type="video", caption=caption, markdown=markdown,
-                                               html=html, keyboard=keyboard, **data)
+                                               type="video", thumb=thumb, caption=caption,
+                                               markdown=markdown, html=html, keyboard=keyboard,
+                                               **data)
 
     def edit_message_animation(self, chat: Chat, message: TelegramMessage, animation: Attachment,
                                thumb: Optional[Attachment]=None, caption: Optional[str]=None,
@@ -804,14 +808,6 @@ class TelegramAgent(Agent):
                                keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         if width is not None:
             data["width"] = width
         if height is not None:
@@ -819,8 +815,8 @@ class TelegramAgent(Agent):
         if duration is not None:
             data["duration"] = duration
         return self.edit_message_media(chat=chat, message=message, media=animation,
-                                       type="animation", caption=caption, markdown=markdown,
-                                       html=html, keyboard=keyboard, **data)
+                                       type="animation", thumb=thumb, caption=caption,
+                                       markdown=markdown, html=html, keyboard=keyboard, **data)
 
     async def a_edit_message_animation(self, chat: Chat, message: TelegramMessage,
                                        animation: Attachment, thumb: Optional[Attachment]=None,
@@ -830,14 +826,6 @@ class TelegramAgent(Agent):
                                        keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         if width is not None:
             data["width"] = width
         if height is not None:
@@ -845,8 +833,9 @@ class TelegramAgent(Agent):
         if duration is not None:
             data["duration"] = duration
         return await self.a_edit_message_media(chat=chat, message=message, media=animation,
-                                               type="animation", caption=caption, markdown=markdown,
-                                               html=html, keyboard=keyboard, **data)
+                                               type="animation", thumb=thumb, caption=caption,
+                                               markdown=markdown, html=html, keyboard=keyboard,
+                                               **data)
 
     def edit_message_audio(self, chat: Chat, message: TelegramMessage, audio: Attachment,
                            thumb: Optional[Attachment]=None, caption: Optional[str]=None,
@@ -855,14 +844,6 @@ class TelegramAgent(Agent):
                            keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         if duration is not None:
             data["duration"] = duration
         if performer is not None:
@@ -870,7 +851,7 @@ class TelegramAgent(Agent):
         if title is not None:
             data["title"] = title
         return self.edit_message_media(chat=chat, message=message, media=audio, type="audio",
-                                       caption=caption, markdown=markdown, html=html,
+                                       thumb=thumb, caption=caption, markdown=markdown, html=html,
                                        keyboard=keyboard, **data)
 
     async def a_edit_message_audio(self, chat: Chat, message: TelegramMessage,
@@ -881,41 +862,25 @@ class TelegramAgent(Agent):
                                    keyboard: Optional[TelegramInlineKeyboard]=None):
 
         data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         if duration is not None:
             data["duration"] = duration
         if performer is not None:
             data["performer"] = performer
         if title is not None:
             data["title"] = title
-        return await self.a_edit_message_media(chat=chat, message=message, media=video,
-                                               type="audio", caption=caption, markdown=markdown,
-                                               html=html, keyboard=keyboard, **data)
+        return await self.a_edit_message_media(chat=chat, message=message, media=audio,
+                                               type="audio", thumb=thumb, caption=caption,
+                                               markdown=markdown, html=html, keyboard=keyboard,
+                                               **data)
 
     def edit_message_document(self, chat: Chat, message: TelegramMessage, document: Attachment,
                               thumb: Optional[Attachment]=None, caption: Optional[str]=None,
                               markdown: bool=False, html: bool=False,
                               keyboard: Optional[TelegramInlineKeyboard]=None):
 
-        data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         return self.edit_message_media(chat=chat, message=message, media=document, type="document",
-                                       caption=caption, markdown=markdown, html=html,
-                                       keyboard=keyboard, **data)
+                                       thumb=thumb, caption=caption, markdown=markdown, html=html,
+                                       keyboard=keyboard)
 
     async def a_edit_message_document(self, chat: Chat, message: TelegramMessage,
                                       document: Attachment, thumb: Optional[Attachment]=None,
@@ -923,18 +888,9 @@ class TelegramAgent(Agent):
                                       html: bool=False,
                                       keyboard: Optional[TelegramInlineKeyboard]=None):
 
-        data = {}
-        if thumb is not None:
-            if "id" in attachment.raw:
-                data["thumb"] = attachment.raw["id"]
-            elif attachment.url is not None:
-                data["thumb"] = attachment.url
-                response = requests.post(url, data=data)
-            elif attachment.filepath is not None:
-                data["thumb"] = open(attachment.filepath)
         return await self.a_edit_message_media(chat=chat, message=message, media=document,
-                                               type="document", caption=caption, markdown=markdown,
-                                               html=html, keyboard=keyboard, **data)
+                                               type="document", thumb=thumb, caption=caption,
+                                               markdown=markdown, html=html, keyboard=keyboard)
 
     def edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
                               keyboard: TelegramInlineKeyboard):
@@ -947,8 +903,9 @@ class TelegramAgent(Agent):
         }
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
-                              self.name, response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
                                       keyboard: TelegramInlineKeyboard):
@@ -962,8 +919,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
-                              self.name, response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
 
     def delete_message(self, chat: Chat, message: TelegramMessage):
 
@@ -971,8 +929,9 @@ class TelegramAgent(Agent):
         data = {"chat_id": chat.id, "message_id": message.raw["id"]}
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
-                              response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_delete_message(self, chat: Chat, message: TelegramMessage):
 
@@ -981,8 +940,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
-                              response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
 
     def send_chat_action(self, chat: Chat, action: str):
 
@@ -990,8 +950,9 @@ class TelegramAgent(Agent):
         data = {"chat_id": chat.id, "action": action}
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
-                              self.name, response.status_code, response.text)
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
+                                  self.name, response.status_code, response.text)
 
     async def a_send_chat_action(self, chat: Chat, action: str):
 
@@ -1000,8 +961,9 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
-                              self.name, response.status, await response.text())
+            if self.logger:
+                self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
+                                  self.name, response.status, await response.text())
 
     """
     def get_me(self):
@@ -1669,6 +1631,24 @@ class TelegramAttachment(Attachment):
             url = None
 
         return cls(id=data["file_id"], url=url, size=data.get("file_size"))
+
+    def render(self):
+
+        if "id" in self.raw:
+            return self.raw["id"]
+        elif self.url is not None:
+            return self.url
+        elif self.filepath is not None:
+            return open(self.filepath)
+
+    async def a_render(self):
+
+        if "id" in self.raw:
+            return self.raw["id"]
+        elif self.url is not None:
+            return self.url
+        elif self.filepath is not None:
+            return open(self.filepath)
 
     @property
     def id(self):

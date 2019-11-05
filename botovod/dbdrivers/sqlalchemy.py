@@ -28,7 +28,9 @@ def add(one: bool=True):
                     DBDriver.session.add_all(result)
             DBDriver.session.commit()
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -88,7 +90,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
         return self.dialog
 
-    @add()
+    @add(one=True)
     def set_dialog(self, name: Optional[str]=None):
 
         self.dialog = name
@@ -99,7 +101,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
         return self.next_step
 
-    @add()
+    @add(one=True)
     def set_next_step(self, next_step: Optional[str]=None):
 
         self.next_step = next_step
@@ -119,7 +121,7 @@ class Follower(dbdrivers.Follower, Common, Base):
             messages = messages.filter(Message.text.like(text))
         return [message.to_object() for message in messages.all()]
 
-    @add()
+    @add(one=True)
     def add_history(self, datetime: datetime, text: Optional[str]=None,
                     images: Iterable[Attachment]=(), audios: Iterable[Attachment]=(),
                     videos: Iterable[Attachment]=(), documents: Iterable[Attachment]=(),
@@ -171,7 +173,7 @@ class Follower(dbdrivers.Follower, Common, Base):
             logger.error("Cannot get value '%s' for follower %s %s - incorrect json", name,
                          self.bot, self.chat)
 
-    @add()
+    @add(one=True)
     def set_value(self, name: str, value):
 
         try:
@@ -240,8 +242,9 @@ class Message(Common, Base):
 
 
 class DBDriver(dbdrivers.DBDriver):
-    def __init__(self, engine: str, database: str, host: Optional[Union[str, int]]=None,
-                 username: Optional[str]=None, password: Optional[str]=None, debug: bool=False):
+    @classmethod
+    def connect(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+                username: Optional[str]=None, password: Optional[str]=None, debug: bool=False):
 
         dsn = f"{engine}://"
         if username is not None and password is not None:
@@ -249,27 +252,30 @@ class DBDriver(dbdrivers.DBDriver):
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        self.engine = create_engine(dsn, echo=debug)
-        self.metadata = Base.metadata
-        self.metadata.create_all(self.engine)
+        cls.engine = create_engine(dsn, echo=debug)
+        cls.metadata = Base.metadata
+        cls.metadata.create_all(cls.engine)
         Session = sessionmaker()
-        Session.configure(bind=self.engine)
-        self.session = Session()
+        Session.configure(bind=cls.engine)
+        cls.session = Session()
 
-    def get_follower(self, agent: Agent, chat: Chat) -> Follower:
+    @classmethod
+    def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
 
-        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
+        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
         return follower.filter(Follower.chat == chat.id).first()
 
-    @add()
-    def add_follower(self, agent: Agent, chat: Chat) -> Follower:
+    @classmethod
+    @add(one=True)
+    def add_follower(cls, agent: Agent, chat: Chat) -> Follower:
 
         follower = Follower(chat=chat.id, bot=agent.name)
         return follower
 
-    @delete()
-    def delete_follower(self, agent: Agent, chat: Chat):
+    @classmethod
+    @delete(one=True)
+    def delete_follower(cls, agent: Agent, chat: Chat):
 
-        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
+        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
         follower = follower.filter(Follower.chat == chat.id)
         return follower

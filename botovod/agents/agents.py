@@ -1,3 +1,4 @@
+from __future__ import annotations
 from ..exceptions import HandlerNotPassed
 import asyncio
 from datetime import datetime
@@ -6,7 +7,7 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 
 class Agent:
-    def __init__(self, message_storage: object=None, logger: Optional[logging.Logger]=None):
+    def __init__(self, logger: Optional[logging.Logger]=None):
 
         self.logger = logger
         self.botovod = None
@@ -42,12 +43,12 @@ class Agent:
 
         return self.responser(headers, body)
 
-    async def alisten(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
+    async def a_listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
 
         if self.logger:
             self.logger.debug("[%s:%s] Get updates.", self, self.name)
 
-        messages = await self.aparser(headers, body)
+        messages = await self.a_parser(headers, body)
         for chat, message in messages:
             if self.botovod.dbdriver is not None:
                 follower = await self.botovod.dbdriver.a_get_follower(self, chat)
@@ -55,20 +56,20 @@ class Agent:
                     follower = await self.botovod.dbdriver.a_add_follower(self, chat)
             else:
                 follower = None
-            for handler in self.botovod._handlers.items():
+            for handler in self.botovod._handlers.values():
                 try:
                     await handler(self, chat, message, follower)
                 except HandlerNotPassed:
                     continue
                 break
 
-        return await self.aresponser(headers, body)
+        return await self.a_responser(headers, body)
 
     def start(self):
 
         raise NotImplementedError
 
-    async def astart(self):
+    async def a_start(self):
 
         raise NotImplementedError
 
@@ -76,7 +77,7 @@ class Agent:
 
         raise NotImplementedError
 
-    async def astop(self):
+    async def a_stop(self):
 
         raise NotImplementedError
 
@@ -84,7 +85,7 @@ class Agent:
 
         raise NotImplementedError
 
-    async def aparser(self, headers: Dict[str, str], body: str) -> List[Tuple(Chat, Message)]:
+    async def a_parser(self, headers: Dict[str, str], body: str) -> List[Tuple(Chat, Message)]:
 
         raise NotImplementedError
 
@@ -92,8 +93,8 @@ class Agent:
 
         raise NotImplementedError
 
-    async def aresponser(self, headers: Dict[str, str],
-                         body: str) -> Tuple[int, Dict[str, str], str]:
+    async def a_responser(self, headers: Dict[str, str],
+                          body: str) -> Tuple[int, Dict[str, str], str]:
 
         raise NotImplementedError
 
@@ -104,11 +105,11 @@ class Agent:
 
         raise NotImplementedError
 
-    async def asend_message(self, chat: Chat, text: Optional[str]=None,
-                            images: Iterator[Attachment]=(), audios: Iterator[Attachment]=(),
-                            documents: Iterator[Attachment]=(), videos: Iterator[Attachment]=(),
-                            locations: Iterator[Location]=(), keyboard: Optional[Keyboard]=None,
-                            **raw):
+    async def a_send_message(self, chat: Chat, text: Optional[str]=None,
+                             images: Iterator[Attachment]=(), audios: Iterator[Attachment]=(),
+                             documents: Iterator[Attachment]=(), videos: Iterator[Attachment]=(),
+                             locations: Iterator[Location]=(), keyboard: Optional[Keyboard]=None,
+                             **raw):
 
         raise NotImplementedError
 

@@ -179,33 +179,23 @@ class Message(Common, db.Model):
 
 
 class DBDriver(dbdrivers.DBDriver):
+    db = db
+
     @classmethod
-    async def __ainit__(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+    async def a_connect(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
                         username: Optional[str]=None, password: Optional[str]=None):
 
-        dbdriver = cls()
+        try:
+            await cls.db.pop_bind().close()
+        except gino.exceptions.UninitializedError:
+            pass
         dsn = f"{engine}://"
         if username is not None and password is not None:
             dsn += f"{username}:{password}@"
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        dbdriver.engine = await gino.create_engine(dsn)
-        await db.gino.create_all(dbdriver.engine)
-
-        return dbdriver
-
-    @classmethod
-    async def acreate(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
-                      username: Optional[str]=None, password: Optional[str]=None):
-
-        return DBDriver.__ainit__(
-            engine=engine,
-            database=database,
-            host=host,
-            username=username,
-            password=password,
-        )
+        await cls.db.set_bind(dsn)
 
     @classmethod
     async def a_get_follower(cls, agent: Agent, chat: Chat) -> Optional[Follower]:

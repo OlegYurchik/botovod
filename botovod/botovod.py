@@ -31,6 +31,10 @@ class Botovod:
 
         return self._items.get(name)
 
+    def add_handlers(self, **handlers: Dict[str, Callable]):
+
+        self._handlers.update(handlers)
+
     def add_handler(self, name: str, handler: Callable):
 
         self._handlers[name] = handler
@@ -43,9 +47,16 @@ class Botovod:
 
         del self._handlers[name]
 
+    def add_agents(self, **agents: Dict[str, Agent]):
+
+        self._agents.update(agents)
+        for agent in agents.values():
+            agent.botovod = self
+
     def add_agent(self, name: str, agent: Agent):
 
         self._agents[name] = agent
+        agent.botovod = self
 
     def get_agent(self, name: str):
 
@@ -53,6 +64,8 @@ class Botovod:
 
     def remove_agent(self, name: str):
 
+        agent = self._agents[name]
+        agent.botovod = None
         del self._agents[name]
 
     def start(self):
@@ -60,37 +73,31 @@ class Botovod:
         for agent in self._agents.values():
             agent.start()
 
-    async def astart(self):
+    async def a_start(self):
 
         for agent in self._agents.values():
-            await agent.astart()
+            await agent.a_start()
 
     def stop(self):
 
         for agent in self._agents.values():
             agent.stop()
 
-    async def astop(self):
+    async def a_stop(self):
 
         for agent in self._agents.values():
-            await agent.astop()
+            await agent.a_sstop()
 
-    def listen(
-            self,
-            name: str,
-            headers: Dict[str, str],
-            body: str) -> Optional[Tuple[int, Dict[str, str], str]]:
+    def listen(self, name: str, headers: Dict[str, str],
+               body: str) -> Optional[Tuple[int, Dict[str, str], str]]:
 
         if name is not None and name not in self._agents:
             raise AgentNotExist(name)
 
         return self._agents[name].listen(headers, body)
 
-    async def alisten(
-            self,
-            name: str,
-            headers: Dict[str, str],
-            body: str) -> (Tuple[int, Dict[str, str], str], None):
+    async def a_listen(self, name: str, headers: Dict[str, str],
+                       body: str) -> (Tuple[int, Dict[str, str], str], None):
 
         if name is not None and name not in self._agents:
             raise AgentNotExist(name)

@@ -102,7 +102,7 @@ class AsyncDialog:
                     videos: Iterator[Attachment]=(), locations: Iterator[Location]=(),
                     keyboard: Optional[Keyboard]=None, **raw):
 
-        return await self.agent.asend_message(
+        return await self.agent.a_send_message(
             chat=self.chat,
             text=text,
             images=images,
