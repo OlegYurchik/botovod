@@ -4,7 +4,7 @@ from os.path import join, dirname
 
 setup(
     name = "botovod",
-    version = "0.1.9",
+    version = "0.1.10",
     
     author = "Oleg Yurchik",
     author_email = "oleg.yurchik@protonmail.com",
