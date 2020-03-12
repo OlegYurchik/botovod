@@ -48,9 +48,7 @@ class TelegramAgent(Agent):
         self.running = True
 
         if self.method == self.POLLING:
-            if self.thread and self.thread.is_alive():
-                self.thread.join()
-            self.thread = Thread(target=self.polling, daemon=True)
+            self.thread = Thread(target=self.polling)
             self.thread.start()
             log_message = "[%s:%s] Started by polling."
         elif self.method == self.WEBHOOK:
@@ -58,6 +56,8 @@ class TelegramAgent(Agent):
 
         if self.logger:
             self.logger.info(log_message, self, self.name)
+
+        self.thread.join()
 
     async def a_start(self):
 
@@ -716,8 +716,8 @@ class TelegramAgent(Agent):
                                    keyboard: Optional[TelegramInlineKeyboard]=None, **raw):
 
         url = self.BASE_URL.format(token=self.token, method="editMessageMedia")
-        attachment_data = TelegramAttachment.a_render(media)
-        thumb_data = TelegramAttachment.a_render(thumb) if thumb else None
+        attachment_data = await TelegramAttachment.a_render(media)
+        thumb_data = await TelegramAttachment.a_render(thumb) if thumb else None
 
         data = {"chat_id": chat.id, "message_id": message.id}
         media_data = {"type": type, "media": attachment_data}
@@ -1639,7 +1639,7 @@ class TelegramAttachment(Attachment):
         elif self.url is not None:
             return self.url
         elif self.filepath is not None:
-            return open(self.filepath)
+            return open(self.filepath, "rb")
 
     async def a_render(self):
 
@@ -1648,7 +1648,7 @@ class TelegramAttachment(Attachment):
         elif self.url is not None:
             return self.url
         elif self.filepath is not None:
-            return open(self.filepath)
+            return open(self.filepath, "rb")
 
     @property
     def id(self):
