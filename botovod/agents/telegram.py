@@ -723,7 +723,7 @@ class TelegramAgent(Agent):
         media_data = {"type": type, "media": attachment_data}
         if isinstance(thumb_data, io.IOBase):
             data["thumb"] = thumb_data
-        else:
+        elif thumb_data:
             media_data["thumb"] = thumb_data
         if caption:
             media_data["caption"] = caption
