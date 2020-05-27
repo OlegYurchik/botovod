@@ -252,6 +252,60 @@ class TelegramAgent(Agent):
             self.logger.info("[%s:%s] Set webhook.", self, self.name)
             self.logger.info("RESPONSE: %s", await response.text())
 
+    def get_webhook_info(self):
+        url = self.BASE_URL.format(token=self.token, method="getWebhookInfo")
+
+        try:
+            data = requests.post(url).json()
+            if not data["ok"]:
+                return None
+            return data["result"]
+        except Exception:
+            if self.logger:
+                self.logger.exception("[%s:%s] Got exception")
+                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
+                                  self, self.name, response.status_code, response.text)
+
+    async def a_get_webhook_info(self):
+        url = self.BASE_URL.format(token=self.token, method="getWebhookInfo")
+
+        try:
+            async with aiohttp.ClientSession() as session, session.post(url) as response:
+                data = await response.json()
+            if not data["ok"]:
+                return None
+            return data["result"]
+        except Exception:
+            if self.logger:
+                self.logger.exception("[%s:%s] Got exception")
+                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
+                                  self, self.name, response.status_code, response.text)
+
+    def get_me(self):
+        url = self.BASE_URL.format(token=self.token, method="getMe")
+
+        try:
+            data = requests.post(url).json()["result"]
+            return TelegramUser.parse(data)
+        except Exception:
+            if self.logger:
+                self.logger.exception("[%s:%s] Got exception")
+                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
+                                  self, self.name, response.status_code, response.text)
+
+    async def a_get_me(self):
+        url = self.BASE_URL.format(token=self.token, method="getMe")
+
+        try:
+            async with aiohttp.ClientSession() as session, session.post(url) as response:
+                data = await response.json()["result"]
+            return TelegramUser.parse(data)
+        except Exception:
+            if self.logger:
+                self.logger.exception("[%s:%s] Got exception")
+                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
+                                  self, self.name, response.status_code, response.text)
+
     def send_message(self, chat: Chat, text: Optional[str]=None, images: Iterator[Attachment]=(),
                      audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
                      videos: Iterator[Attachment]=(), locations: Iterator[Location]=(),
