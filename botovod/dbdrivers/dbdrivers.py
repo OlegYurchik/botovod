@@ -121,42 +121,34 @@ class Follower:
 
 
 class DBDriver:
-    @classmethod
-    def connect(cls, **settings) -> DBDriver:
+    def connect(self, **settings):
 
         raise NotImplementedError
 
-    @classmethod
-    async def a_connect(cls, **settings) -> DBDriver:
+    async def a_connect(self, **settings):
 
         raise NotImplementedError
 
-    @classmethod
-    def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    def get_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         raise NotImplementedError
 
-    @classmethod
-    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    async def a_get_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         raise NotImplementedError
 
-    @classmethod
-    def add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    def add_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         raise NotImplementedError
 
-    @classmethod
-    async def a_add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    async def a_add_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         raise NotImplementedError
 
-    @classmethod
-    def delete_follower(cls, agent: Agent, chat: Chat):
+    def delete_follower(self, agent: Agent, chat: Chat):
 
         raise NotImplementedError
 
-    @classmethod
-    async def a_delete_follower(cls, agent: Agent, chat: Chat):
+    async def a_delete_follower(self, agent: Agent, chat: Chat):
 
         raise NotImplementedError

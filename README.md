@@ -115,7 +115,7 @@ def echo(agent, chat, messsage, follower=None):
 
 
 botovod = Botovod()
-botovod.add_handler("echo", echo)
+botovod.add_handler(echo)
 
 telegram_agent = TelegramAgent(token="your-telegram-token", method="polling)
 botovod.add_agent("telegram", telegram_agent)
@@ -149,10 +149,11 @@ class RegisterDialog(Dialog):
         # your code
 
 
-DBDriver.connect(engine="sqlite", database="file.db")
-botovod = Botovod(DBDriver)
+dbdriver = DBDriver()
+dbdriver.connect(engine="sqlite", database="file.db")
+botovod = Botovod(dbdriver)
 
-botovod.add_handler("RegisterDialog", RegisterDialog)
+botovod.add_handler(RegisterDialog)
 
 telegram_agent = TelegramAgent(token="your-telegram-token")
 botovod.add_agent("telegram", telegram_agent)

@@ -2,8 +2,7 @@ from .agents import Agent
 from .dbdrivers import DBDriver 
 from .exceptions import AgentNotExist
 import asyncio
-from collections import OrderedDict
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Iterable, Optional, Tuple
 
 
 class Botovod:
@@ -12,7 +11,7 @@ class Botovod:
         self.dbdriver = dbdriver
 
         self._agents = {}
-        self._handlers = OrderedDict()
+        self._handlers = []
         self._items = {}
 
     def __setitem__(self, name: str, value):
@@ -31,21 +30,20 @@ class Botovod:
 
         return self._items.get(name)
 
-    def add_handlers(self, **handlers: Dict[str, Callable]):
+    def add_handlers(self, *handlers: Iterable[Callable]):
 
-        self._handlers.update(handlers)
+        self._handlers.extend(handlers)
 
-    def add_handler(self, name: str, handler: Callable):
+    def add_handler(self, handler: Callable):
 
-        self._handlers[name] = handler
+        self._handlers.append(handler)
 
-    def get_handler(self, name: str):
+    def remove_handler(self, handler: Callable):
 
-        return self._handlers.get(name)
-
-    def remove_handler(self, name: str):
-
-        del self._handlers[name]
+        for index in range(len(self._handlers)):
+            if self._handlers[index] is handler:
+                del self._handlers[index]
+                break
 
     def add_agents(self, **agents: Dict[str, Agent]):
 
@@ -71,22 +69,26 @@ class Botovod:
     def start(self):
 
         for agent in self._agents.values():
-            agent.start()
+            if not agent.is_running:
+                agent.start()
 
     async def a_start(self):
 
         for agent in self._agents.values():
-            await agent.a_start()
+            if not agent.is_running:
+                await agent.a_start()
 
     def stop(self):
 
         for agent in self._agents.values():
-            agent.stop()
+            if agent.is_running:
+                agent.stop()
 
     async def a_stop(self):
 
         for agent in self._agents.values():
-            await agent.a_sstop()
+            if agent.is_running:
+                await agent.a_stop()
 
     def listen(self, name: str, headers: Dict[str, str],
                body: str) -> Optional[Tuple[int, Dict[str, str], str]]:

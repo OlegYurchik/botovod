@@ -242,8 +242,7 @@ class Message(Common, Base):
 
 
 class DBDriver(dbdrivers.DBDriver):
-    @classmethod
-    def connect(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+    def connect(self, engine: str, database: str, host: Optional[Union[str, int]]=None,
                 username: Optional[str]=None, password: Optional[str]=None, debug: bool=False):
 
         dsn = f"{engine}://"
@@ -252,30 +251,27 @@ class DBDriver(dbdrivers.DBDriver):
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        cls.engine = create_engine(dsn, echo=debug)
-        cls.metadata = Base.metadata
-        cls.metadata.create_all(cls.engine)
+        self.engine = create_engine(dsn, echo=debug)
+        self.metadata = Base.metadata
+        self.metadata.create_all(self.engine)
         Session = sessionmaker()
-        Session.configure(bind=cls.engine)
-        cls.session = Session()
+        Session.configure(bind=self.engine)
+        self.session = Session()
 
-    @classmethod
-    def get_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    def get_follower(self, agent: Agent, chat: Chat) -> Follower:
 
-        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
+        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
         return follower.filter(Follower.chat == chat.id).first()
 
-    @classmethod
     @add(one=True)
-    def add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    def add_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         follower = Follower(chat=chat.id, bot=agent.name)
         return follower
 
-    @classmethod
     @delete(one=True)
-    def delete_follower(cls, agent: Agent, chat: Chat):
+    def delete_follower(self, agent: Agent, chat: Chat):
 
-        follower = cls.session.query(Follower).filter(Follower.bot == agent.name)
+        follower = self.session.query(Follower).filter(Follower.bot == agent.name)
         follower = follower.filter(Follower.chat == chat.id)
         return follower

@@ -181,12 +181,11 @@ class Message(Common, db.Model):
 class DBDriver(dbdrivers.DBDriver):
     db = db
 
-    @classmethod
-    async def a_connect(cls, engine: str, database: str, host: Optional[Union[str, int]]=None,
+    async def a_connect(self, engine: str, database: str, host: Optional[Union[str, int]]=None,
                         username: Optional[str]=None, password: Optional[str]=None):
 
         try:
-            await cls.db.pop_bind().close()
+            await self.db.pop_bind().close()
         except gino.exceptions.UninitializedError:
             pass
         dsn = f"{engine}://"
@@ -195,22 +194,19 @@ class DBDriver(dbdrivers.DBDriver):
         if host is not None:
             dsn += f"{host}/"
         dsn += database
-        await cls.db.set_bind(dsn)
+        await self.db.set_bind(dsn)
 
-    @classmethod
-    async def a_get_follower(cls, agent: Agent, chat: Chat) -> Optional[Follower]:
+    async def a_get_follower(self, agent: Agent, chat: Chat) -> Optional[Follower]:
 
         return await Follower.query.where(Follower.bot == agent.__class__.__name__).where(
             Follower.chat == chat.id
         ).gino.first()
 
-    @classmethod
-    async def a_add_follower(cls, agent: Agent, chat: Chat) -> Follower:
+    async def a_add_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         return await Follower.create(bot=agent.__class__.__name__, chat=chat.id)
 
-    @classmethod
-    async def a_delete_follower(cls, agent: Agent, chat: Chat):
+    async def a_delete_follower(self, agent: Agent, chat: Chat):
 
         await Follower.delete.where(Follower.bot == agent.__class__.__name__).where(
             Follower.chat == chat.id
