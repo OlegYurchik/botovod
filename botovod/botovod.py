@@ -2,7 +2,7 @@ from .agents import Agent
 from .dbdrivers import DBDriver 
 from .exceptions import AgentNotExist
 import asyncio
-from typing import Callable, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, Optional, Tuple
 
 
 class Botovod:
