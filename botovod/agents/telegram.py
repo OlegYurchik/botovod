@@ -285,8 +285,8 @@ class TelegramAgent(Agent):
         url = self.BASE_URL.format(token=self.token, method="getMe")
 
         try:
-            data = requests.post(url).json()["result"]
-            return TelegramUser.parse(data)
+            data = requests.post(url).json()
+            return TelegramUser.parse(data["result"])
         except Exception:
             if self.logger:
                 self.logger.exception("[%s:%s] Got exception")
@@ -298,8 +298,8 @@ class TelegramAgent(Agent):
 
         try:
             async with aiohttp.ClientSession() as session, session.post(url) as response:
-                data = await response.json()["result"]
-            return TelegramUser.parse(data)
+                data = await response.json()
+            return TelegramUser.parse(data["result"])
         except Exception:
             if self.logger:
                 self.logger.exception("[%s:%s] Got exception")
