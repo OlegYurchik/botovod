@@ -245,7 +245,7 @@ class TelegramAgent(Agent):
         if response.status != 200:
             if self.logger:
                 self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
-                                  self.name, response.status, response.text)
+                                  self.name, response.status, await response.text())
             return
 
         if self.logger:
@@ -279,7 +279,7 @@ class TelegramAgent(Agent):
             if self.logger:
                 self.logger.exception("[%s:%s] Got exception")
                 self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status_code, response.text)
+                                  self, self.name, response.status, await response.text())
 
     def get_me(self):
         url = self.BASE_URL.format(token=self.token, method="getMe")
@@ -291,7 +291,7 @@ class TelegramAgent(Agent):
             if self.logger:
                 self.logger.exception("[%s:%s] Got exception")
                 self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status_code, response.text)
+                                  self, self.name, response.status, await response.text())
 
     async def a_get_me(self):
         url = self.BASE_URL.format(token=self.token, method="getMe")
@@ -304,7 +304,7 @@ class TelegramAgent(Agent):
             if self.logger:
                 self.logger.exception("[%s:%s] Got exception")
                 self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status_code, response.text)
+                                  self, self.name, response.status, await response.text())
 
     def send_message(self, chat: Chat, text: Optional[str]=None, images: Iterator[Attachment]=(),
                      audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
