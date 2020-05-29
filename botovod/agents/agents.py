@@ -34,7 +34,7 @@ class Agent:
                     follower = self.botovod.dbdriver.add_follower(self, chat)
             else:
                 follower = None
-            for handler in self.botovod._handlers.values():
+            for handler in self.botovod._handlers:
                 try:
                     handler(self, chat, message, follower)
                 except HandlerNotPassed:
@@ -56,7 +56,7 @@ class Agent:
                     follower = await self.botovod.dbdriver.a_add_follower(self, chat)
             else:
                 follower = None
-            for handler in self.botovod._handlers.values():
+            for handler in self.botovod._handlers:
                 try:
                     await handler(self, chat, message, follower)
                 except HandlerNotPassed:
