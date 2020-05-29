@@ -59,7 +59,7 @@ class TelegramAgent(Agent):
 
         self.thread.join()
 
-    async def a_start(self):
+    async def a_start(self, loop):
 
         if self.logger:
             self.logger.info("[%s:%s] Starting agent...", self, self.name)
@@ -68,7 +68,7 @@ class TelegramAgent(Agent):
         self.running = True
 
         if self.method == self.POLLING:
-            asyncio.create_task(self.a_polling())
+            loop.create_task(self.a_polling())
             log_message = "[%s:%s] Started by polling."
         elif self.method == self.WEBHOOK:
             log_message = "[%s:%s] Started by webhook."
