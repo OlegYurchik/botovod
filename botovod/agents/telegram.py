@@ -413,9 +413,8 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url, data=data)
             if response.status != 200:
-                if self.logger:
-                    self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                      self.name, response.status, await response.text())
+                logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
+                              self.name, response.status, await response.text())
             else:
                 messages.append(TelegramMessage.parse((await response.json())["result"]))
         for image in images:
