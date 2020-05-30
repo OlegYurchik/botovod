@@ -13,6 +13,36 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 import time
 
 
+logger = logging.getLogger(__name__)
+
+
+class TelegramRequester:
+    BASE_URL = "https://api.telegram.org/bot{token}/{method}"
+    FILE_URL = "https://api.telegram.org/file/bot{token}/{file_path}"
+
+    def __init__(self):
+        self.session = aiohttp.ClientSession(raise_for_status=True)
+
+    def request(self, token, method, data=None, files=None):
+        url = self.BASE_URL.format(token=token, method=method)
+
+        response = requests.post(url, data=data, files=files)
+        response.raise_for_status()
+        data = response.json()
+        if data["ok"]:
+            return data["result"]
+
+    async def a_request(self, token, method, data=None, files=None):
+        url = self.BASE_URL.format(token=token, method=method)
+
+        if data is not None and files is not None:
+            data.update(files)
+        async with self.session.post(url, data=data) as response:
+            data = await response.json()
+        if data["ok"]
+            return data["result"]
+
+
 class TelegramAgent(Agent):
     WEBHOOK = "webhook"
     POLLING = "polling"
@@ -21,10 +51,10 @@ class TelegramAgent(Agent):
     FILE_URL = "https://api.telegram.org/file/bot{token}/{file_path}"
 
     def __init__(self, token: str, method: str=POLLING, delay: int=5,
-                 webhook_url: Optional[str]=None, certificate_path: Optional[str]=None,
-                 logger: Optional[logging.Logger]=None):
+                 webhook_url: Optional[str]=None, certificate_path: Optional[str]=None):
 
-        super().__init__(logger=logger)
+        super().__init__()
+        self.requester = TelegramRequester()
         self.token = token
         self.method = method
 
@@ -41,8 +71,7 @@ class TelegramAgent(Agent):
 
     def start(self):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Starting agent...", self, self.name)
+        logger.info("[%s:%s] Starting agent...", self, self.name)
 
         self.set_webhook()
         self.running = True
@@ -54,15 +83,13 @@ class TelegramAgent(Agent):
         elif self.method == self.WEBHOOK:
             log_message = "[%s:%s] Started by webhook."
 
-        if self.logger:
-            self.logger.info(log_message, self, self.name)
+        logger.info(log_message, self, self.name)
 
         self.thread.join()
 
     async def a_start(self, loop):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Starting agent...", self, self.name)
+        logger.info("[%s:%s] Starting agent...", self, self.name)
 
         await self.a_set_webhook()
         self.running = True
@@ -73,31 +100,26 @@ class TelegramAgent(Agent):
         elif self.method == self.WEBHOOK:
             log_message = "[%s:%s] Started by webhook."
 
-        if self.logger:
-            self.logger.info(log_message, self, self.name)
+        logger.info(log_message, self, self.name)
 
     def stop(self):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Stopping agent...", self, self.name)
+        logger.info("[%s:%s] Stopping agent...", self, self.name)
 
         if self.method == self.POLLING:
             self.thread.join()
             self.thread = None
         self.running = False
 
-        if self.logger:
-            self.logger.info("[%s:%s] Agent stopped.", self, self.name)
+        logger.info("[%s:%s] Agent stopped.", self, self.name)
 
     async def a_stop(self):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Stopping agent...", self, self.name)
+        logger.info("[%s:%s] Stopping agent...", self, self.name)
 
         self.running = False
 
-        if self.logger:
-            self.logger.info("[%s:%s] Agent stopped.", self, self.name)
+        logger.info("[%s:%s] Agent stopped.", self, self.name)
 
     def parser(self, headers: Dict[str, str], body: str) -> List[Tuple[Chat, Message]]:
 
@@ -168,10 +190,9 @@ class TelegramAgent(Agent):
                 for update in updates:
                     self.listen(response.headers, json.dumps(update))
             except Exception:
-                if self.logger:
-                    self.logger.exception("[%s:%s] Got exception")
-                    self.logger.error("[%s:%s] Get incorrect update! Code: %s. Response: %s", self,
-                                      self.name, response.status_code, response.text)
+                logger.exception("[%s:%s] Got exception")
+                logger.error("[%s:%s] Get incorrect update! Code: %s. Response: %s", self,
+                             self.name, response.status_code, response.text)
             finally:
                 time.sleep(self.delay)
 
@@ -187,17 +208,15 @@ class TelegramAgent(Agent):
                 for update in updates:
                     await self.a_listen(dict(response.headers), json.dumps(update))
             except Exception:
-                if self.logger:
-                    self.logger.exception("[%s:%s] Got exception")
-                    self.logger.error("[%s:%s] Get incorrect update! Code: %s. Response: %s", self,
-                                      self.name, response.status, await response.text())
+                logger.exception("[%s:%s] Got exception")
+                logger.error("[%s:%s] Get incorrect update! Code: %s. Response: %s", self,
+                             self.name, response.status, await response.text())
             finally:
                 await asyncio.sleep(self.delay)
 
     def set_webhook(self):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Setting webhook...", self, self.name)
+        logger.info("[%s:%s] Setting webhook...", self, self.name)
 
         url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
@@ -213,18 +232,15 @@ class TelegramAgent(Agent):
         else:
             response = requests.post(url)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
+                         self.name, response.status_code, response.text)
             return
 
-        if self.logger:
-            self.logger.info("[%s:%s] Set webhook.", self, self.name)
+        logger.info("[%s:%s] Set webhook.", self, self.name)
 
     async def a_set_webhook(self):
 
-        if self.logger:
-            self.logger.info("[%s:%s] Setting webhook...", self, self.name)
+        logger.info("[%s:%s] Setting webhook...", self, self.name)
 
         url = self.BASE_URL.format(token=self.token, method="setWebhook")
         if self.method == self.WEBHOOK:
@@ -243,14 +259,12 @@ class TelegramAgent(Agent):
             async with aiohttp.ClientSession() as session:
                 response = await session.post(url)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Webhook doesn't set! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
             return
 
-        if self.logger:
-            self.logger.info("[%s:%s] Set webhook.", self, self.name)
-            self.logger.info("RESPONSE: %s", await response.text())
+        logger.info("[%s:%s] Set webhook.", self, self.name)
+        logger.info("RESPONSE: %s", await response.text())
 
     def get_webhook_info(self):
         url = self.BASE_URL.format(token=self.token, method="getWebhookInfo")
@@ -261,10 +275,9 @@ class TelegramAgent(Agent):
                 return None
             return data["result"]
         except Exception:
-            if self.logger:
-                self.logger.exception("[%s:%s] Got exception")
-                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status_code, response.text)
+            logger.exception("[%s:%s] Got exception")
+            logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s", self,
+                         self.name, response.status_code, response.text)
 
     async def a_get_webhook_info(self):
         url = self.BASE_URL.format(token=self.token, method="getWebhookInfo")
@@ -276,10 +289,9 @@ class TelegramAgent(Agent):
                 return None
             return data["result"]
         except Exception:
-            if self.logger:
-                self.logger.exception("[%s:%s] Got exception")
-                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status, await response.text())
+            logger.exception("[%s:%s] Got exception")
+            logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s", self,
+                         self.name, response.status, await response.text())
 
     def get_me(self):
         url = self.BASE_URL.format(token=self.token, method="getMe")
@@ -288,10 +300,9 @@ class TelegramAgent(Agent):
             data = requests.post(url).json()
             return TelegramUser.parse(agent=self, data=data["result"])
         except Exception:
-            if self.logger:
-                self.logger.exception("[%s:%s] Got exception")
-                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status_code, response.text)
+            logger.exception("[%s:%s] Got exception")
+            logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s", self,
+                         self.name, response.status_code, response.text)
 
     async def a_get_me(self):
         url = self.BASE_URL.format(token=self.token, method="getMe")
@@ -301,10 +312,9 @@ class TelegramAgent(Agent):
                 data = await response.json()
             return TelegramUser.parse(agent=self, data=data["result"])
         except Exception:
-            if self.logger:
-                self.logger.exception("[%s:%s] Got exception")
-                self.logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s",
-                                  self, self.name, response.status, await response.text())
+            logger.exception("[%s:%s] Got exception")
+            logger.error("[%s:%s] Get incorrect webhook info! Code: %s. Response: %s", self,
+                         self.name, response.status, await response.text())
 
     def send_message(self, chat: Chat, text: Optional[str]=None, images: Iterator[Attachment]=(),
                      audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
@@ -337,9 +347,8 @@ class TelegramAgent(Agent):
                 data["reply_to_message_id"] = reply.id
             response = requests.post(url, data=data)
             if response.status_code != 200:
-                if self.logger:
-                    self.logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self,
-                                      self.name, response.status_code, response.text)
+                logger.error("[%s:%s] Cannot send message! Code: %s; Body: %s", self, self.name,
+                             response.status_code, response.text)
             else:
                 messages.append(TelegramMessage.parse(response.json()["result"]))
         for image in images:
@@ -458,9 +467,8 @@ class TelegramAgent(Agent):
         response = requests.post(url, data=data, files=files)
 
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name,
-                                  type, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name, type,
+                         response.status_code, response.text)
         else:
             return TelegramMessage.parse(response.json()["result"])
 
@@ -484,9 +492,8 @@ class TelegramAgent(Agent):
             async with session.post(url, data=data) as response:
                 return response
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name,
-                                  type, response.status, await response.text())
+            logger.error("[%s:%s] Cannot send %s! Code: %s; Body: %s", self, self.name, type,
+                         response.status, await response.text())
         else:
             return await TelegramMessage.a_parse((await response.json())["result"])
 
@@ -592,9 +599,8 @@ class TelegramAgent(Agent):
             data["reply_markup"] = '{"remove_keyboard": true}'
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
         else:
             return TelegramMessage.parse(response.json())
 
@@ -613,9 +619,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot send location! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
         else:
             return await TelegramMessage.a_parse((await response.json())["result"])
 
@@ -624,9 +629,8 @@ class TelegramAgent(Agent):
         url = self.BASE_URL.format(token=self.token, method="getFile")
         response = requests.get(url, params={"file_id": file_id})
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
-                                  response.status_code, response.text)
+            logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
         return TelegramAttachment.parse(response.json()["result"], agent=self)
 
     async def a_get_file(self, file_id: int):
@@ -635,9 +639,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.get(url, params={"file_id": file_id})
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
-                                  response.status, await response.text())
+            logger.error("[%s:%s] Cannot get file! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
         return await TelegramAttachment.a_parse((await response.json())["result"], agent=self)
 
     def edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
@@ -659,9 +662,8 @@ class TelegramAgent(Agent):
             data["parse_mode"] = "Markdown"
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
 
     async def a_edit_message_text(self, chat: Chat, message: TelegramMessage, text: str,
                                   keyboard: Optional[TelegramInlineKeyboard]=None, html: bool=False,
@@ -683,9 +685,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot edit message text! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
 
     def edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
                              keyboard: Optional[TelegramInlineKeyboard]=None, html: bool=False,
@@ -701,9 +702,8 @@ class TelegramAgent(Agent):
             data["parse_mode"] = "Markdown"
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
 
     async def a_edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
                                      keyboard: Optional[TelegramInlineKeyboard]=None,
@@ -720,9 +720,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot edit message caption! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
 
     def edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment, type: str,
                            thumb: Optional[Attachment]=None, caption: Optional[str]=None,
@@ -759,9 +758,8 @@ class TelegramAgent(Agent):
         response = requests.post(url=url, data=data, files=files)
 
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot edit message media! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
 
     async def a_edit_message_media(self, chat: Chat, message: TelegramMessage, media: Attachment,
                                    type: str, thumb: Optional[Attachment]=None,
@@ -792,9 +790,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message %s! Code: %s; Body: %s", self,
-                                  self.name, type, response.status, await response.text())
+            logger.error("[%s:%s] Cannot edit message %s! Code: %s; Body: %s", self, self.name,
+                         type, response.status, await response.text())
 
     def edit_message_image(self, chat: Chat, message: TelegramMessage, image: Attachment,
                            caption: Optional[str]=None, markdown: bool=False, html: bool=False,
@@ -957,9 +954,8 @@ class TelegramAgent(Agent):
         }
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                         self.name, response.status_code, response.text)
 
     async def a_edit_message_keyboard(self, chat: Chat, message: TelegramMessage,
                                       keyboard: TelegramInlineKeyboard):
@@ -973,9 +969,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot edit message keyboard! Code: %s; Body: %s", self,
+                         self.name, response.status, await response.text())
 
     def delete_message(self, chat: Chat, message: TelegramMessage):
 
@@ -983,9 +978,8 @@ class TelegramAgent(Agent):
         data = {"chat_id": chat.id, "message_id": message.raw["id"]}
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
 
     async def a_delete_message(self, chat: Chat, message: TelegramMessage):
 
@@ -994,9 +988,8 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot delete message! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
 
     def send_chat_action(self, chat: Chat, action: str):
 
@@ -1004,9 +997,8 @@ class TelegramAgent(Agent):
         data = {"chat_id": chat.id, "action": action}
         response = requests.post(url, data=data)
         if response.status_code != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
-                                  self.name, response.status_code, response.text)
+            logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self, self.name,
+                         response.status_code, response.text)
 
     async def a_send_chat_action(self, chat: Chat, action: str):
 
@@ -1015,9 +1007,30 @@ class TelegramAgent(Agent):
         async with aiohttp.ClientSession() as session:
             response = await session.post(url, data=data)
         if response.status != 200:
-            if self.logger:
-                self.logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self,
-                                  self.name, response.status, await response.text())
+            logger.error("[%s:%s] Cannot send chat action! Code: %s; Body: %s", self, self.name,
+                         response.status, await response.text())
+
+    def send_sticker(self, chat: Chat, sticker: Attachment, keyboard: Optional[Keyboard]=None,
+                     remove_keyboard: bool=False):
+
+        return self.send_attachment(
+            type="sticker",
+            chat=chat,
+            attachment=sticker,
+            keyboard=keyboard,
+            remove_keyboard=remove_keyboard,
+        )
+
+    async def a_send_sticker(self, chat: Chat, sticker: Attachment,
+                             keyboard: Optional[Keyboard]=None, remove_keyboard: bool=False):
+
+        return await self.a_send_attachment(
+            type="sticker",
+            chat=chat,
+            attachment=sticker,
+            keyboard=keyboard,
+            remove_keyboard=remove_keyboard,
+        )
 
     """
     def get_me(self):
@@ -1025,20 +1038,6 @@ class TelegramAgent(Agent):
 
     def forward_message(self, to_chat, from_chat, message):
         pass
-
-    def send_sticker(self, chat, sticker, **data):
-        url = self.url % (self.token, "sendSticker")
-        data = {"chat_id": chat.id}
-        data.extend(**args)
-        if hasattr(sticker, "id") and not sticker.id is None:
-            data["sticker"] = sticker.id
-            response = requests.post(url, data=data)
-        elif not sticker.url is None:
-            data["sticker"] = sticker.url
-            response = requests.post(url, data=data)
-        elif not sticker.file_path is None:
-            with open(sticker.file_path) as f:
-                response = requests.post(url, data=data, files={"sticker": f})
     
     def send_voice(self, chat, audio, **args):
         url = self.url % (self.token, "sendVoice")

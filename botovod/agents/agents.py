@@ -6,16 +6,17 @@ import logging
 from typing import Dict, Iterator, List, Optional, Tuple
 
 
-class Agent:
-    def __init__(self, logger: Optional[logging.Logger]=None):
+logger = logging.getLogger(__name__)
 
-        self.logger = logger
+
+class Agent:
+    def __init__(self):
+
         self.botovod = None
         self.name = None
         self.running = False
 
-        if logger:
-            logger.info("Initialize agent %s", self)
+        logger.info("Initialize agent %s", self)
 
     def __repr__(self) -> str:
 
@@ -23,8 +24,7 @@ class Agent:
 
     def listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
 
-        if self.logger:
-            self.logger.debug("[%s:%s] Get request.", self, self.name)
+        logger.debug("[%s:%s] Get request.", self, self.name)
 
         messages = self.parser(headers, body)
         for chat, message in messages:
@@ -45,8 +45,7 @@ class Agent:
 
     async def a_listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
 
-        if self.logger:
-            self.logger.debug("[%s:%s] Get updates.", self, self.name)
+        logger.debug("[%s:%s] Get updates.", self, self.name)
 
         messages = await self.a_parser(headers, body)
         for chat, message in messages:
