@@ -39,7 +39,7 @@ class TelegramRequester:
             data.update(files)
         async with self.session.post(url, data=data) as response:
             data = await response.json()
-        if data["ok"]
+        if data["ok"]:
             return data["result"]
 
 
