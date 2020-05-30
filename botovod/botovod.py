@@ -26,9 +26,9 @@ class Botovod:
 
         del self._items[name]
 
-    def get(self, name: str):
+    def get(self, name: str, default=None):
 
-        return self._items.get(name)
+        return self._items.get(name, default)
 
     def add_handlers(self, *handlers: Iterable[Callable]):
 
@@ -44,6 +44,10 @@ class Botovod:
             if self._handlers[index] is handler:
                 del self._handlers[index]
                 break
+
+    @property
+    def handlers(self):
+        return self._handlers.copy()
 
     def add_agents(self, **agents: Dict[str, Agent]):
 
@@ -65,6 +69,10 @@ class Botovod:
         agent = self._agents[name]
         agent.botovod = None
         del self._agents[name]
+
+    @property
+    def agents(self):
+        return self._agents.values()
 
     def start(self):
 

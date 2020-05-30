@@ -270,7 +270,8 @@ class TelegramAgent(Agent):
         url = self.BASE_URL.format(token=self.token, method="getWebhookInfo")
 
         try:
-            data = requests.post(url).json()
+            response = requests.post(url)
+            data = response.json()
             if not data["ok"]:
                 return None
             return data["result"]
@@ -297,7 +298,8 @@ class TelegramAgent(Agent):
         url = self.BASE_URL.format(token=self.token, method="getMe")
 
         try:
-            data = requests.post(url).json()
+            response = requests.post(url)
+            data = response.json()
             return TelegramUser.parse(agent=self, data=data["result"])
         except Exception:
             logger.exception("[%s:%s] Got exception")
