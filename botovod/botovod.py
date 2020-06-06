@@ -47,6 +47,7 @@ class Botovod:
 
     @property
     def handlers(self):
+
         return self._handlers.copy()
 
     def add_agents(self, **agents: Dict[str, Agent]):
@@ -62,16 +63,19 @@ class Botovod:
 
     def get_agent(self, name: str):
 
-        return self._agents[name]
+        return self._agents.get(name)
 
     def remove_agent(self, name: str):
 
-        agent = self._agents[name]
+        agent = self._agents.get(name)
+        if agent is None:
+            return
         agent.botovod = None
         del self._agents[name]
 
     @property
     def agents(self):
+
         return self._agents.values()
 
     def start(self):
