@@ -99,7 +99,7 @@ class Agent:
 
     def send_message(self, chat: Chat, text: Optional[str]=None, images: Iterator[Attachment]=(),
                      audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
-                     videos: Iterator[Attachment]=(), locations: Iterator[Attachment]=(),
+                     videos: Iterator[Attachment]=(), locations: Iterator[Location]=(),
                      keyboard: Optional[Keyboard]=None, **raw):
 
         raise NotImplementedError

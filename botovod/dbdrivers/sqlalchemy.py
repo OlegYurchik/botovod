@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 def add(one: bool=True):
     def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+        def wrapper(self, *args, **kwargs):
 
-            result = func(*args, **kwargs)
+            result = func(self, *args, **kwargs)
             if result is not None:
                 if one:
-                    DBDriver.session.add(result)
+                    self.session.add(result)
                 else:
-                    DBDriver.session.add_all(result)
-            DBDriver.session.commit()
+                    self.session.add_all(result)
+            self.session.commit()
             return result
 
         return wrapper
@@ -36,15 +36,15 @@ def add(one: bool=True):
 
 def delete(one: bool=True):
     def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+        def wrapper(self, *args, **kwargs):
 
-            result = func(*args, **kwargs)
+            result = func(self, *args, **kwargs)
             if result is not None:
                 if one:
-                    DBDriver.session.delete(result)
+                    self.session.delete(result)
                 else:
-                    DBDriver.session.delete_all(result)
-            DBDriver.session.commit()
+                    self.session.delete_all(result)
+            self.session.commit()
 
             return result
 
@@ -55,10 +55,10 @@ def delete(one: bool=True):
 
 def update():
     def decorator(func: Callable) -> Callable:
-        def wrapper(*args, **kwargs):
+        def wrapper(self, *args, **kwargs):
 
-            result = func(*args, **kwargs)
-            DBDriver.session.commit()
+            result = func(self, *args, **kwargs)
+            self.session.commit()
             return result
 
         return wrapper

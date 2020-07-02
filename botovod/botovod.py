@@ -1,7 +1,6 @@
 from .agents import Agent
 from .dbdrivers import DBDriver 
 from .exceptions import AgentNotExist
-import asyncio
 from typing import Callable, Dict, Iterable, Optional, Tuple
 
 
@@ -50,11 +49,20 @@ class Botovod:
 
         return self._handlers.copy()
 
+    @property
+    def agents(self):
+
+        return self._agents.values()
+
     def add_agents(self, **agents: Dict[str, Agent]):
 
         self._agents.update(agents)
         for agent in agents.values():
             agent.botovod = self
+
+    def get_agents(self) -> Iterable[str, Agent]:
+
+        return self._agents.items()
 
     def add_agent(self, name: str, agent: Agent):
 
@@ -72,11 +80,6 @@ class Botovod:
             return
         agent.botovod = None
         del self._agents[name]
-
-    @property
-    def agents(self):
-
-        return self._agents.values()
 
     def start(self):
 
