@@ -60,10 +60,6 @@ class Botovod:
         for agent in agents.values():
             agent.botovod = self
 
-    def get_agents(self) -> Iterable[str, Agent]:
-
-        return self._agents.items()
-
     def add_agent(self, name: str, agent: Agent):
 
         self._agents[name] = agent
