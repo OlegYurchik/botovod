@@ -19,7 +19,7 @@ class Common:
 
 
 class Follower(dbdrivers.Follower, Common, db.Model):
-    __tablename__ = "botovod_followers"
+    __tablename__ = "botovod.followers"
 
     chat = db.Column(db.Unicode(length=64), nullable=False)
     bot = db.Column(db.Unicode(length=64), nullable=False)
@@ -140,7 +140,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
 
 
 class Message(Common, db.Model):
-    __tablename__ = "botovod_messages"
+    __tablename__ = "botovod.messages"
 
     follower_id = db.Column(db.Integer, db.ForeignKey(f"{Follower.__tablename__}.id"),
                             nullable=False)

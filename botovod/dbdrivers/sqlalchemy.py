@@ -73,7 +73,7 @@ class Common:
 
 
 class Follower(dbdrivers.Follower, Common, Base):
-    __tablename__ = "botovod_followers"
+    __tablename__ = "botovod.followers"
 
     chat = Column(String(64), nullable=False)
     bot = Column(String(64), nullable=False)
@@ -202,7 +202,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
 
 class Message(Common, Base):
-    __tablename__ = "botovod_messages"
+    __tablename__ = "botovod.messages"
 
     follower_id = Column(Integer, ForeignKey(f"{Follower.__tablename__}.id"), nullable=False)    
     follower = relationship("Follower", back_populates="messages", uselist=False)
