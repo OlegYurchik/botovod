@@ -19,7 +19,7 @@ class Common:
 
 
 class Follower(dbdrivers.Follower, Common, db.Model):
-    __tablename__ = "botovod.followers"
+    __tablename__ = "botovod_followers"
 
     chat = db.Column(db.Unicode(length=64), nullable=False)
     bot = db.Column(db.Unicode(length=64), nullable=False)
@@ -140,7 +140,7 @@ class Follower(dbdrivers.Follower, Common, db.Model):
 
 
 class Message(Common, db.Model):
-    __tablename__ = "botovod.messages"
+    __tablename__ = "botovod_messages"
 
     follower_id = db.Column(db.Integer, db.ForeignKey(f"{Follower.__tablename__}.id"),
                             nullable=False)
@@ -183,11 +183,7 @@ class DBDriver(dbdrivers.DBDriver):
 
     async def a_connect(self, engine: str, database: str, host: Optional[Union[str, int]]=None,
                         username: Optional[str]=None, password: Optional[str]=None):
-
-        try:
-            await self.db.pop_bind().close()
-        except gino.exceptions.UninitializedError:
-            pass
+        await self.a_close()
         dsn = f"{engine}://"
         if username is not None and password is not None:
             dsn += f"{username}:{password}@"
@@ -195,6 +191,12 @@ class DBDriver(dbdrivers.DBDriver):
             dsn += f"{host}/"
         dsn += database
         await self.db.set_bind(dsn)
+
+    async def a_close(self):
+        try:
+            await self.db.pop_bind().close()
+        except gino.exceptions.UninitializedError:
+            pass
 
     async def a_get_follower(self, agent: Agent, chat: Chat) -> Optional[Follower]:
 

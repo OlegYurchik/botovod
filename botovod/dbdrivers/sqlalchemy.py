@@ -73,7 +73,7 @@ class Common:
 
 
 class Follower(dbdrivers.Follower, Common, Base):
-    __tablename__ = "botovod.followers"
+    __tablename__ = "botovod_followers"
 
     chat = Column(String(64), nullable=False)
     bot = Column(String(64), nullable=False)
@@ -202,7 +202,7 @@ class Follower(dbdrivers.Follower, Common, Base):
 
 
 class Message(Common, Base):
-    __tablename__ = "botovod.messages"
+    __tablename__ = "botovod_messages"
 
     follower_id = Column(Integer, ForeignKey(f"{Follower.__tablename__}.id"), nullable=False)    
     follower = relationship("Follower", back_populates="messages", uselist=False)
@@ -253,10 +253,13 @@ class DBDriver(dbdrivers.DBDriver):
         dsn += database
         self.engine = create_engine(dsn, echo=debug)
         self.metadata = Base.metadata
-        self.metadata.create_all(self.engine)
         Session = sessionmaker()
         Session.configure(bind=self.engine)
         self.session = Session()
+
+    def close(self):
+
+        self.session.close()
 
     def get_follower(self, agent: Agent, chat: Chat) -> Follower:
 

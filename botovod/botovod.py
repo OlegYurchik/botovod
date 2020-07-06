@@ -54,6 +54,10 @@ class Botovod:
 
         return self._agents.values()
 
+    def get_agents(self):
+
+        return self._agents.items()
+
     def add_agents(self, **agents: Dict[str, Agent]):
 
         self._agents.update(agents)

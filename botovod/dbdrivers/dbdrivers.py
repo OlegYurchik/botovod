@@ -129,6 +129,14 @@ class DBDriver:
 
         raise NotImplementedError
 
+    def close(self):
+
+        raise NotImplementedError
+
+    async def a_close(self):
+
+        raise NotImplementedError
+
     def get_follower(self, agent: Agent, chat: Chat) -> Follower:
 
         raise NotImplementedError
