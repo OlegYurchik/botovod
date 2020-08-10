@@ -44,6 +44,10 @@ class Botovod:
                 del self._handlers[index]
                 break
 
+    def clear_handlers(self):
+
+        self._handlers.clear()
+
     @property
     def handlers(self):
 
