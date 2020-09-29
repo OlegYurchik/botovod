@@ -1,2 +1,2 @@
-from .agents import Agent, Attachment, Chat, Keyboard, KeyboardButton, Location, Message
-from .telegram import TelegramAgent
+from .common import Agent
+from .types import Attachment, Chat, Keyboard, KeyboardButton, Location, Message

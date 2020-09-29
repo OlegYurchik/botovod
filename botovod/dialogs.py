@@ -1,15 +1,13 @@
+from typing import Callable, Iterator, Optional
+
 from .agents import Agent, Attachment, Chat, Keyboard, Location, Message
-from .agents.telegram import TelegramAgent, TelegramCallback
 from .dbdrivers import Follower
 from .exceptions import HandlerNotPassed
-import json
-from typing import Any, Callable, Iterator, Optional
 
 
 class Dialog:
     def __init__(self, agent: Agent, chat: Chat, message: Message,
                  follower: Follower):
-
         self.agent = agent
         self.chat = chat
         self.message = message
@@ -17,28 +15,28 @@ class Dialog:
 
     def __new__(cls, agent: Agent, chat: Chat, message: Message,
                 follower: Follower):
-
         dialog = super().__new__(cls)
-        dialog.__init__(agent=agent, chat=chat, message=message,
-                        follower=follower)
+        dialog.__init__(agent=agent, chat=chat, message=message, follower=follower)
 
-        dialog_name = dialog.follower.get_dialog()
-        if dialog_name is not None and dialog_name != cls.__name__:
+        return dialog.process()
+
+    def process(self):
+        dialog_name = self.follower.get_dialog()
+        if dialog_name is not None and dialog_name != self.__class__.__name__:
             raise HandlerNotPassed
 
         if dialog_name is None:
-            dialog.follower.set_dialog(cls.__name__)
-        next_step = dialog.follower.get_next_step()
+            self.follower.set_dialog(self.__class__.__name__)
+        next_step = self.follower.get_next_step()
         if next_step:
-            getattr(dialog, next_step)()
+            getattr(self, next_step)()
         else:
-            return dialog.start()
+            return self.start()
 
-    def reply(self, text: Optional[str]=None, images: Iterator[Attachment]=(),
-              audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
-              videos: Iterator[Attachment]=(), locations: Iterator[Location]=(),
-              keyboard: Optional[Keyboard]=None, **raw):
-
+    def reply(self, text: Optional[str] = None, images: Iterator[Attachment] = (),
+              audios: Iterator[Attachment] = (), documents: Iterator[Attachment] = (),
+              videos: Iterator[Attachment] = (), locations: Iterator[Location] = (),
+              keyboard: Optional[Keyboard] = None, **raw):
         self.agent.send_message(
             self.chat,
             text=text,
@@ -52,7 +50,6 @@ class Dialog:
         )
 
     def set_next_step(self, function: Callable):
-
         if hasattr(function, "__self__"):
             name = function.__self__.__class__.__name__
         else:
@@ -61,47 +58,33 @@ class Dialog:
         self.follower.set_next_step(function.__name__)
 
     def start_dialog(self, dialog_class: Callable):
-
         self.follower.set_dialog(dialog_class.__name__)
         dialog_class(self.agent, self.chat, self.message, self.follower)
 
     def start(self):
-
         raise NotImplementedError
 
 
-class AsyncDialog:
-    async def __init__(self, agent: Agent, chat: Chat, message: Message, follower: Follower):
-
-        self.agent = agent
-        self.chat = chat
-        self.message = message
-        self.follower = follower
-
-    async def __new__(cls, agent: Agent, chat: Chat, message: Message, follower: Follower):
-
-        dialog = super().__new__(cls)
-        await dialog.__init__(agent=agent, chat=chat, message=message, follower=follower)
-
-        dialog_name = await dialog.follower.a_get_dialog()
-        if dialog_name is not None and dialog_name != cls.__name__:
+class AsyncDialog(Dialog):
+    async def process(self):
+        dialog_name = await self.follower.a_get_dialog()
+        if dialog_name is not None and dialog_name != self.__class__.__name__:
             raise HandlerNotPassed
 
         next_step = "start"
         if dialog_name is None:
-            await dialog.follower.a_set_dialog(cls.__name__)
+            await self.follower.a_set_dialog(self.__class__.__name__)
         else:
-            next_step = await dialog.follower.a_get_next_step()
+            next_step = await self.follower.a_get_next_step()
         if next_step:
-            await getattr(dialog, next_step)()
+            await getattr(self, next_step)()
         else:
-            return await dialog.start()
+            return await self.start()
 
-    async def reply(self, text: Optional[str]=None, images: Iterator[Attachment]=(),
-                    audios: Iterator[Attachment]=(), documents: Iterator[Attachment]=(),
-                    videos: Iterator[Attachment]=(), locations: Iterator[Location]=(),
-                    keyboard: Optional[Keyboard]=None, **raw):
-
+    async def reply(self, text: Optional[str] = None, images: Iterator[Attachment] = (),
+                    audios: Iterator[Attachment] = (), documents: Iterator[Attachment] = (),
+                    videos: Iterator[Attachment] = (), locations: Iterator[Location] = (),
+                    keyboard: Optional[Keyboard] = None, **raw):
         return await self.agent.a_send_message(
             chat=self.chat,
             text=text,
@@ -115,7 +98,6 @@ class AsyncDialog:
         )
 
     async def set_next_step(self, function: Callable):
-
         if hasattr(function, "__self__"):
             await self.follower.a_set_dialog(function.__self__.__class__.__name__)
         else:
@@ -123,12 +105,10 @@ class AsyncDialog:
         await self.follower.a_set_next_step(function.__name__)
 
     async def start_dialog(self, dialog_class: Callable):
-
         await self.follower.a_set_dialog(dialog_class.__name__)
         await dialog_class(self.agent, self.chat, self.message, self.follower)
 
     async def start(self):
-
         raise NotImplementedError
 
 
