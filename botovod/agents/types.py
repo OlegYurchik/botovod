@@ -1,8 +1,6 @@
 from __future__ import annotations
 from typing import Iterator, Optional
 
-from .common import Agent
-
 
 class Entity:
     def __init__(self, **raw):
@@ -15,7 +13,7 @@ class Entity:
 
 
 class Chat(Entity):
-    def __init__(self, agent: Agent, id: str, **raw):
+    def __init__(self, agent, id: str, **raw):
         super().__init__(**raw)
         self.agent = agent
         self.id = id
