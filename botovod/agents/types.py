@@ -4,7 +4,7 @@ from typing import Iterator, Optional
 
 class Entity:
     def __init__(self, **raw):
-        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
+        self.raw = raw
 
     def __getattr__(self, item):
         if item in self.raw:
