@@ -64,7 +64,7 @@ class TelegramAgent(Agent):
     def __init__(self, token: str, method: str = POLLING, delay: int = 5,
                  webhook_url: Optional[str] = None, certificate_path: Optional[str] = None):
         super().__init__()
-        self.requester = Requester()
+        self.requester = Requester(logger=self.logger)
         self.token = token
         self.method = method
 
