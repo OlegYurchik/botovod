@@ -4,12 +4,10 @@ from typing import Iterator, Optional
 
 class Entity:
     def __init__(self, **raw):
-        self.raw = raw
+        self.raw = dict(filter(lambda item: item[1] is not None, raw.items()))
 
     def __getattr__(self, item):
-        if item in self.raw:
-            return self.raw[item]
-        return super().__getattribute__(item)
+        return self.raw.get(item)
 
 
 class Chat(Entity):
