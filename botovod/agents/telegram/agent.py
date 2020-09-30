@@ -116,7 +116,8 @@ class TelegramAgent(Agent):
 
         self.logger.info("Agent stopped.")
 
-    def parser(self, headers: Dict[str, str], body: str) -> List[Tuple[Chat, Message]]:
+    def parser(self, headers: Dict[str, str],
+               body: str) -> List[Tuple[Chat, Message]]:
         update = json.loads(body)
         messages = []
         if update["update_id"] <= self.last_update:
@@ -141,7 +142,7 @@ class TelegramAgent(Agent):
         return messages
 
     async def a_parser(self, headers: Dict[str, str],
-                       body: str) -> List[Tuple[Chat, TelegramAgent]]:
+                       body: str) -> List[Tuple[Chat, Agent]]:
         update = json.loads(body)
         messages = []
         if update["update_id"] <= self.last_update:
@@ -247,12 +248,12 @@ class TelegramAgent(Agent):
             return TelegramUser.parse(agent=self, data=data)
 
     def send_message(self, chat: Chat, text: Optional[str] = None,
-                     images: Iterator[Attachment] = (),
-                     audios: Iterator[Attachment] = (), documents: Iterator[Attachment] = (),
-                     videos: Iterator[Attachment] = (), locations: Iterator[Location] = (),
-                     keyboard: Optional[Keyboard] = None, html: bool = False,
-                     markdown: bool = False, web_preview: bool = True, notification: bool = True,
-                     reply: Optional[Message] = None, remove_keyboard: bool = False):
+                     images: Iterator[Attachment] = (), audios: Iterator[Attachment] = (),
+                     documents: Iterator[Attachment] = (), videos: Iterator[Attachment] = (),
+                     locations: Iterator[Location] = (), keyboard: Optional[Keyboard] = None,
+                     html: bool = False, markdown: bool = False, web_preview: bool = True,
+                     notification: bool = True, reply: Optional[Message] = None,
+                     remove_keyboard: bool = False):
         messages = []
         if text is not None:
             payload = {
