@@ -596,8 +596,7 @@ class TelegramAgent(Agent):
             payload["parse_mode"] = "HTML"
         elif markdown:
             payload["parse_mode"] = "Markdown"
-        await self.requester.a_do_method(token=self.token, method="editMessageCaption",
-                                         payload=payload)
+        self.requester.do_method(token=self.token, method="editMessageCaption", payload=payload)
 
     async def a_edit_message_caption(self, chat: Chat, message: TelegramMessage, caption: str,
                                      keyboard: Optional[TelegramInlineKeyboard] = None,
