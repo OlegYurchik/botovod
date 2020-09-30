@@ -28,11 +28,11 @@ class TelegramUser(Chat):
 
     def render(self):
         data = {"id": self.id, "is_bot": self.raw["is_bot"], "first_name": self.raw["first_name"]}
-        if "last_name" in self.raw:
+        if self.raw.get("last_name") is not None:
             data["last_name"] = self.raw["last_name"]
-        if "username" in self.raw:
+        if self.raw.get("username") is not None:
             data["username"] = self.raw["username"]
-        if "language" in self.raw:
+        if self.raw.get("language") is not None:
             data["language_code"] = self.raw["language"]
         return data
 
@@ -71,33 +71,33 @@ class TelegramChat(Chat):
 
     def render(self):
         data = {"id": self.id, "type": self.raw["type"]}
-        if "title" in self.raw:
+        if self.raw.get("title") is not None:
             data["title"] = self.raw["title"]
-        if "username" in self.raw:
+        if self.raw.get("username") is not None:
             data["username"] = self.raw["username"]
-        if "first_name" in self.raw:
+        if self.raw.get("first_name") is not None:
             data["first_name"] = self.raw["first_name"]
-        if "last_name" in self.raw:
+        if self.raw.get("last_name") is not None:
             data["last_name"] = self.raw["last_name"]
-        if "photo" in self.raw:
+        if self.raw.get("photo") is not None:
             data["photo"] = self.raw["photo"]
-        if "description" in self.raw:
+        if self.raw.get("description") is not None:
             data["description"] = self.raw["description"]
-        if "invite_link" in self.raw:
+        if self.raw.get("invite_link") is not None:
             data["invite_link"] = self.raw["invite_link"]
-        if "pinned_message" in self.raw:
+        if self.raw.get("pinned_message") is not None:
             data["pinned_message"] = self.raw["pinned_message"]
-        if "permissions" in self.raw:
+        if self.raw.get("permissions") is not None:
             data["permissions"] = self.raw["permissions"]
-        if "sticker_set" in self.raw:
+        if self.raw.get("sticker_set") is not None:
             data["sticker_set_name"] = self.raw["sticker_set"]
-        if "can_set_sticker" in self.raw:
+        if self.raw.get("can_sticker_set") is not None:
             data["can_set_sticker_set"] = self.raw["can_set_sticker"]
         return data
 
     @property
     def pinned_message(self) -> Optional[TelegramMessage]:
-        if "pinned_message" in self.raw:
+        if self.raw.get("pinned_message") is not None:
             return TelegramMessage.parse(data=self.raw["pinned_message"])
 
 
@@ -219,20 +219,20 @@ class TelegramCallback(Message):
 
     def render(self):
         data = {"id": self.raw["id"], "from": self.raw["user"]}
-        if "message" in self.raw:
+        if self.raw.get("message") is not None:
             data["message"] = self.raw["message"]
-        if "inline_message_id" in self.raw:
+        if self.raw.get("inline_message_id") is not None:
             data["inline_message_id"] = self.raw["inline_message_id"]
-        if "chat_instance" in self.raw:
+        if self.raw.get("chat_instance") is not None:
             data["chat_instance"] = self.raw["chat_instance"]
-        if "data" in self.raw:
+        if self.raw.get("data") is not None:
             data["data"] = self.raw["data"]
-        if "game_short_name" in self.raw:
+        if self.raw.get("game_short_name") is not None:
             data["game_short_name"] = self.raw["game_short_name"]
 
     @property
     def message(self) -> Optional[TelegramMessage]:
-        if "message" in self.raw:
+        if self.raw.get("message") is not None:
             return TelegramMessage.parse(data=self.raw["message"])
 
 
@@ -264,7 +264,7 @@ class TelegramAttachment(Attachment):
         return cls(id=data["file_id"], url=url, size=data.get("file_size"))
 
     def render(self):
-        if "id" in self.raw:
+        if self.raw.get("id") is not None:
             return self.raw["id"]
         elif self.url is not None:
             return self.url
@@ -272,7 +272,7 @@ class TelegramAttachment(Attachment):
             return open(self.filepath, "rb")
 
     async def a_render(self):
-        if "id" in self.raw:
+        if self.raw.get("id") is not None:
             return self.raw["id"]
         elif self.url is not None:
             return self.url
@@ -320,9 +320,6 @@ class TelegramContact:
         if self.vcard is not None:
             data["vcard"] = self.vcard
         return data
-
-
-# STOP HERE
 
 
 class TelegramVenue(Location):
@@ -402,14 +399,14 @@ class TelegramInlineKeyboardButton(KeyboardButton):
 
     def render(self):
         data = {"text": self.text}
-        if "url" in self.raw:
+        if self.raw.get("url") is not None:
             data["url"] = self.raw["url"]
-        if "data" in self.raw:
+        if self.raw.get("data") is not None:
             data["callback_data"] = self.raw["data"]
-        if "inline_query" in self.raw:
+        if self.raw.get("inline_query") is not None:
             data["switch_inline_query"] = self.raw["inline_query"]
-        if "inline_chat" in self.raw:
+        if self.raw.get("inline_chat") is not None:
             data["switch_inline_query_current_chat"] = self.raw["inline_chat"]
-        if "game" in self.raw:
+        if self.raw.get("game") is not None:
             data["callback_game"] = self.raw["game"]
         return data

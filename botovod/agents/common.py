@@ -19,7 +19,6 @@ class Agent:
         logger.addHandler(handler)
         logger.setLevel(level)
         self.logger = logging.LoggerAdapter(logger, {"agent": self})
-        self.logger.info("Initialize agent %s", self)
 
     def __repr__(self) -> str:
         return self.__class__.__name__

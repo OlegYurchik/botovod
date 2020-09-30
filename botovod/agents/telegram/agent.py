@@ -204,32 +204,32 @@ class TelegramAgent(Agent):
     def set_webhook(self):
         self.logger.info("Setting webhook...")
 
-        kwargs = {"token": self.token, "method": "setWebhook"}
+        payload = {}
         if self.method == self.WEBHOOK:
-            kwargs["url"] = self.webhook_url
+            payload["url"] = self.webhook_url
             if self.certificate_path is not None:
-                kwargs["files"] = {"certificate": open(self.certificate_path)}
+                payload["files"] = {"certificate": open(self.certificate_path)}
         try:
-            self.requester.do_method(**kwargs)
+            self.requester.do_method(token=self.token, method="setWebhook", payload=payload)
         finally:
-            if "files" in kwargs:
-                kwargs["files"]["certificate"].close()
+            if "files" in payload:
+                payload["files"]["certificate"].close()
 
         self.logger.info("Set webhook")
 
     async def a_set_webhook(self):
         self.logger.info("Setting webhook...")
 
-        kwargs = {"token": self.token, "method": "setWebhook"}
+        payload = {}
         if self.method == self.WEBHOOK:
-            kwargs["url"] = self.webhook_url
+            payload["url"] = self.webhook_url
             if self.certificate_path is not None:
-                kwargs["files"] = {"certificate": open(self.certificate_path)}
+                payload["files"] = {"certificate": open(self.certificate_path)}
         try:
-            await self.requester.a_do_method(**kwargs)
+            await self.requester.a_do_method(token=self.token, method="setWebhook", payload=payload)
         finally:
-            if "files" in kwargs:
-                kwargs["files"]["certificate"].close()
+            if "files" in payload:
+                payload["files"]["certificate"].close()
 
         self.logger.info("Set webhook.")
 
