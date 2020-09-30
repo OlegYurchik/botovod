@@ -18,12 +18,14 @@ class Requester:
     BASE_URL = "https://api.telegram.org/bot{token}/{method}"
     FILE_URL = "https://api.telegram.org/file/bot{token}/{path}"
 
+    def __init__(self, logger):
+        self.logger = logger
+
     def do_method(self, token: str, method: str, payload: Optional[dict] = None,
                   files: Optional[Dict[str, IO]] = None):
         url = self.BASE_URL.format(token=token, method=method)
 
         response = requests.post(url, data=payload, files=files)
-        response.raise_for_status()
         data = response.json()
         if data["ok"]:
             return data["result"]
@@ -34,7 +36,7 @@ class Requester:
 
         if payload is not None and files is not None:
             payload.update(files)
-        async with aiohttp.ClientSession(raise_for_status=True) as session:
+        async with aiohttp.ClientSession() as session:
             async with session.post(url, data=payload) as response:
                 data = await response.json()
         if data["ok"]:
