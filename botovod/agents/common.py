@@ -7,18 +7,12 @@ from .types import Attachment, Chat, Keyboard, Location, Message
 
 
 class Agent:
-    def __init__(self, level="INFO"):
+    def __init__(self):
         self.botovod = None
         self.running = False
+        self.name = None
 
-        formatter = logging.Formatter("%(asctime)23s[%(levelname)8s]%(agent)s: %(message)s")
-        handler = logging.StreamHandler()
-        handler.setLevel(level)
-        handler.setFormatter(formatter)
-        logger = logging.getLogger(__name__)
-        logger.addHandler(handler)
-        logger.setLevel(level)
-        self.logger = logging.LoggerAdapter(logger, {"agent": self})
+        self.logger = logging.getLogger(__name__)
 
     def __repr__(self) -> str:
         return self.__class__.__name__
