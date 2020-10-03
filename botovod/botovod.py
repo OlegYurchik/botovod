@@ -53,12 +53,18 @@ class Botovod:
 
     def add_agents(self, **agents: Dict[str, Agent]):
         self._agents.update(agents)
-        for agent in agents.values():
+        for name, agent in agents.items():
+            if agent.botovod is not None:
+                agent.botovod.remove_agent(name)
             agent.botovod = self
+            agent.name = name
 
     def add_agent(self, name: str, agent: Agent):
         self._agents[name] = agent
+        if agent.botovod is not None:
+            agent.botovod.remove_agent(name)
         agent.botovod = self
+        agent.name = name
 
     def get_agent(self, name: str):
         return self._agents.get(name)
@@ -68,6 +74,7 @@ class Botovod:
         if agent is None:
             return
         agent.botovod = None
+        agent.name = None
         del self._agents[name]
 
     def start(self):

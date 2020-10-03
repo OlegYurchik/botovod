@@ -80,43 +80,35 @@ class TelegramAgent(Agent):
         self.last_update = 0
 
     def start(self):
-        self.logger.info("Starting agent...")
-
         self.set_webhook()
         self.running = True
         if self.method == self.POLLING:
             self.thread = Thread(target=self.polling)
             self.thread.start()
 
-        self.logger.info("Started by %s.", self.method)
+        self.logger.info("Started %s by %s.", self.name, self.method)
         self.thread.join()
 
     async def a_start(self):
-        self.logger.info("Starting agent...")
-
         await self.a_set_webhook()
         self.running = True
         if self.method == self.POLLING:
             asyncio.get_running_loop().create_task(self.a_polling())
 
-        self.logger.info("Started by %s.", self.method)
+        self.logger.info("Started %s by %s.", self.name, self.method)
 
     def stop(self):
-        self.logger.info("Stopping agent...")
-
         if self.method == self.POLLING:
             self.thread.join()
             self.thread = None
         self.running = False
 
-        self.logger.info("Agent stopped.")
+        self.logger.info("Agent %s stopped.", self.name)
 
     async def a_stop(self):
-        self.logger.info("Stopping agent...")
-
         self.running = False
 
-        self.logger.info("Agent stopped.")
+        self.logger.info("Agent %s stopped.", self.name)
 
     def parser(self, headers: Dict[str, str],
                body: str) -> List[Tuple[Chat, Message]]:
@@ -202,36 +194,36 @@ class TelegramAgent(Agent):
                 await asyncio.sleep(self.delay)
 
     def set_webhook(self):
-        self.logger.info("Setting webhook...")
-
         payload = {}
+        files = {}
         if self.method == self.WEBHOOK:
             payload["url"] = self.webhook_url
             if self.certificate_path is not None:
-                payload["files"] = {"certificate": open(self.certificate_path)}
+                files["certificate"] = open(self.certificate_path)
         try:
-            self.requester.do_method(token=self.token, method="setWebhook", payload=payload)
+            self.requester.do_method(token=self.token, method="setWebhook", payload=payload,
+                                     files=files)
         finally:
-            if "files" in payload:
-                payload["files"]["certificate"].close()
+            if files:
+                files["certificate"].close()
 
-        self.logger.info("Set webhook")
+        self.logger.info("Set %s webhook.", self.name)
 
     async def a_set_webhook(self):
-        self.logger.info("Setting webhook...")
-
         payload = {}
+        files = {}
         if self.method == self.WEBHOOK:
             payload["url"] = self.webhook_url
             if self.certificate_path is not None:
-                payload["files"] = {"certificate": open(self.certificate_path)}
+                files["certificate"] = open(self.certificate_path)
         try:
-            await self.requester.a_do_method(token=self.token, method="setWebhook", payload=payload)
+            await self.requester.a_do_method(token=self.token, method="setWebhook",
+                                             payload=payload, files=files)
         finally:
-            if "files" in payload:
-                payload["files"]["certificate"].close()
+            if files:
+                files["certificate"].close()
 
-        self.logger.info("Set webhook.")
+        self.logger.info("Set %s webhook.", self.name)
 
     def get_webhook_info(self):
         return self.requester.do_method(token=self.token, method="getWebhookInfo")
