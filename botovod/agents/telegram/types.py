@@ -255,7 +255,7 @@ class TelegramAttachment(Attachment):
     @classmethod
     async def a_parse(cls, data: dict, agent=None):
         if "file_path" in data and agent is not None:
-            url = agent.FILE_URL.format(token=agent.token, file_path=data["file_path"])
+            url = agent.requester.FILE_URL.format(token=agent.token, file_path=data["file_path"])
         elif agent is not None:
             return await agent.a_get_file(data["file_id"])
         else:
