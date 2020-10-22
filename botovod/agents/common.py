@@ -17,7 +17,7 @@ class Agent:
     def __repr__(self) -> str:
         return self.__class__.__name__
 
-    def listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
+    def listen(self, headers: Dict[str, str], body: str, **scope) -> Tuple[int, Dict[str, str], str]:
         self.logger.debug("Get request")
 
         messages = self.parser(headers, body)
@@ -29,14 +29,14 @@ class Agent:
                     follower = self.botovod.dbdriver.add_follower(self, chat)
             for handler in self.botovod.handlers:
                 try:
-                    handler(self, chat, message, follower)
+                    handler(self, chat, message, follower, **scope)
                 except HandlerNotPassed:
                     continue
                 break
 
         return self.responser(headers, body)
 
-    async def a_listen(self, headers: Dict[str, str], body: str) -> Tuple[int, Dict[str, str], str]:
+    async def a_listen(self, headers: Dict[str, str], body: str, **scope) -> Tuple[int, Dict[str, str], str]:
         self.logger.debug("Get updates")
 
         messages = await self.a_parser(headers, body)
@@ -49,7 +49,7 @@ class Agent:
                 follower = None
             for handler in self.botovod.handlers:
                 try:
-                    await handler(self, chat, message, follower)
+                    await handler(self, chat, message, follower, **scope)
                 except HandlerNotPassed:
                     continue
                 break

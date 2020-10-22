@@ -102,11 +102,11 @@ class Botovod:
         if name not in self._agents:
             raise AgentNotExistException(name)
 
-        return self._agents[name].listen(headers, body)
+        return self._agents[name].listen(headers, body, **self._items)
 
     async def a_listen(self, name: str, headers: Dict[str, str],
                        body: str) -> (Tuple[int, Dict[str, str], str], None):
         if name not in self._agents:
             raise AgentNotExistException(name)
 
-        return await self._agents[name].a_listen(headers, body)
+        return await self._agents[name].a_listen(headers, body, **self._items)

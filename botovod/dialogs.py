@@ -7,11 +7,14 @@ from .exceptions import HandlerNotPassed
 
 class Dialog:
     def __init__(self, agent: Agent, chat: Chat, message: Message,
-                 follower: Follower):
+                 follower: Follower, **scope):
         self.agent = agent
         self.chat = chat
         self.message = message
         self.follower = follower
+        for name, field in scope.items():
+            setattr(self, name, field)
+        self.scope = scope
 
     def __new__(cls, agent: Agent, chat: Chat, message: Message,
                 follower: Follower):
