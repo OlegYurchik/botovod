@@ -6,20 +6,17 @@ from .exceptions import HandlerNotPassed
 
 
 class Dialog:
-    def __init__(self, agent: Agent, chat: Chat, message: Message,
-                 follower: Follower, **scope):
+    def __init__(self, agent: Agent, chat: Chat, message: Message, follower: Follower, **scope):
         self.agent = agent
         self.chat = chat
         self.message = message
         self.follower = follower
         for name, field in scope.items():
             setattr(self, name, field)
-        self.scope = scope
 
-    def __new__(cls, agent: Agent, chat: Chat, message: Message,
-                follower: Follower):
+    def __new__(cls, agent: Agent, chat: Chat, message: Message, follower: Follower, **scope):
         dialog = super().__new__(cls)
-        dialog.__init__(agent=agent, chat=chat, message=message, follower=follower)
+        dialog.__init__(agent=agent, chat=chat, message=message, follower=follower, **scope)
 
         return dialog.process()
 
