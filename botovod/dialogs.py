@@ -11,8 +11,7 @@ class Dialog:
         self.chat = chat
         self.message = message
         self.follower = follower
-        for name, field in scope.items():
-            setattr(self, name, field)
+        self.scope = scope
 
     def __new__(cls, agent: Agent, chat: Chat, message: Message, follower: Follower, **scope):
         dialog = super().__new__(cls)
@@ -59,7 +58,7 @@ class Dialog:
 
     def start_dialog(self, dialog_class: Callable):
         self.follower.set_dialog(dialog_class.__name__)
-        dialog_class(self.agent, self.chat, self.message, self.follower)
+        dialog_class(self.agent, self.chat, self.message, self.follower, **self.scope)
 
     def start(self):
         raise NotImplementedError
@@ -106,7 +105,7 @@ class AsyncDialog(Dialog):
 
     async def start_dialog(self, dialog_class: Callable):
         await self.follower.a_set_dialog(dialog_class.__name__)
-        await dialog_class(self.agent, self.chat, self.message, self.follower)
+        await dialog_class(self.agent, self.chat, self.message, self.follower, **self.scope)
 
     async def start(self):
         raise NotImplementedError
