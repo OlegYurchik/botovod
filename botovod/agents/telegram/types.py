@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime
 import json
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from botovod.agents.types import Attachment, Chat, Keyboard, KeyboardButton, Location, Message
 
@@ -332,8 +332,8 @@ class TelegramVenue(Location):
 
 
 class TelegramKeyboard(Keyboard):
-    def __init__(self, buttons: Iterator[Iterator[KeyboardButton]], resize: bool = False,
-                 one_time: bool = False, selective: bool = False):
+    def __init__(self, buttons: Iterator[Iterator[Union[KeyboardButton, str]]],
+                 resize: bool = False, one_time: bool = False, selective: bool = False):
         super().__init__(buttons=buttons, resize=resize, one_time=one_time, selective=selective)
 
     def render(self):
@@ -347,7 +347,9 @@ class TelegramKeyboard(Keyboard):
             line_data = []
             data["keyboard"].append(line_data)
             for button in line:
-                if hasattr(button, "render"):
+                if isinstance(button, str):
+                    line_data.append(button)
+                elif hasattr(button, "render"):
                     line_data.append(button.render())
                 else:
                     line_data.append(button.text)
