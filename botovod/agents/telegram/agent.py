@@ -174,7 +174,7 @@ class TelegramAgent(Agent):
                 updates = self.requester.do_method(token=self.token, method="getUpdates",
                                                    payload=payload)
                 for update in updates:
-                    self.listen(headers={}, body=json.dumps(update))
+                    self.listen(headers={}, body=json.dumps(update), **self.botovod._items)
             except Exception:
                 self.logger.exception("Got exception")
             finally:
@@ -187,7 +187,7 @@ class TelegramAgent(Agent):
                 updates = await self.requester.a_do_method(token=self.token, method="getUpdates",
                                                            payload=payload)
                 for update in updates:
-                    await self.a_listen(headers={}, body=json.dumps(update))
+                    await self.a_listen(headers={}, body=json.dumps(update), **self.botovod._items)
             except Exception:
                 self.logger.exception("Got exception")
             finally:
